@@ -1,0 +1,68 @@
+import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { TranslatePipe } from '@ngx-translate/core';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+
+import { CaStore } from '../../../application/ca.store';
+import { EnvironmentSelector } from '../../../../shared/presentation/components/environment-selector/environment-selector';
+import { AlertTable } from '../../components/alert-table/alert-table';
+
+/**
+ * Active alerts of an environment and its monitored containers (US85): open alerts, unresolved or being attended,
+ * with their origin and severity.
+ */
+@Component({
+  selector: 'app-alert-dashboard',
+  standalone: true,
+  imports: [
+    RouterLink,
+    TranslatePipe,
+    MatButtonModule,
+    MatIconModule,
+    EnvironmentSelector,
+    AlertTable,
+  ],
+  templateUrl: './alert-dashboard.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
+  styleUrl: './alert-dashboard.css',
+})
+export class AlertDashboard implements OnInit {
+  /** Store that holds the alerts shown by the table. */
+  protected readonly store = inject(CaStore);
+  /** Environment whose alerts are shown; `null` until one is chosen. */
+  protected readonly environmentId = signal<number | null>(null);
+
+  /**
+   * Clears the previous alerts and errors, loads the devices, and shows the alerts of the preferred environment.
+   *
+   * @remarks
+   * Waits for the environments to load when they are not loaded yet. If there is no preferred environment,
+   * nothing is loaded.
+   */
+  async ngOnInit(): Promise<void> {
+    this.store.clearError();
+    this.store.clearAlerts();
+    this.store.loadDevices();
+    if (!this.store.environmentsLoaded()) await this.store.loadEnvironments();
+    const preferred = this.store.preferredEnvironmentId();
+    if (preferred !== null) this.changeEnvironment(preferred);
+  }
+
+  /**
+   * Shows the alerts of another environment and remembers it as the one the person prefers.
+   *
+   * @param environmentId - The environment chosen
+   */
+  protected changeEnvironment(environmentId: number): void {
+    this.store.rememberEnvironment(environmentId);
+    this.environmentId.set(environmentId);
+    this.refresh();
+  }
+
+  /** Loads the open alerts of the chosen environment again; does nothing if none is chosen. */
+  protected refresh(): void {
+    const environmentId = this.environmentId();
+    if (environmentId !== null) this.store.loadEnvironmentAlerts(environmentId, { active: true });
+  }
+}

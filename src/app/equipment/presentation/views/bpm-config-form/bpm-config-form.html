@@ -1,0 +1,109 @@
+<div class="form-container">
+  <mat-card class="config-card">
+    <mat-card-header>
+      <mat-card-title>{{ 'bpm-config.title' | translate }}</mat-card-title>
+      <mat-card-subtitle>{{ 'bpm-config.subtitle' | translate }}</mat-card-subtitle>
+    </mat-card-header>
+
+    <form [formGroup]="form" (ngSubmit)="onSave()" class="config-form">
+      <mat-card-content>
+        <div class="form-grid">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>{{ 'bpm-config.fields.parameter' | translate }}</mat-label>
+            <input
+              matInput
+              formControlName="parameterName"
+              maxlength="100"
+              [placeholder]="'bpm-config.placeholders.parameter' | translate">
+            <mat-icon matSuffix>label</mat-icon>
+
+            @if (form.get('parameterName')?.hasError('required')) {
+              <mat-error>{{ 'common.required' | translate }}</mat-error>
+            } @else if (form.get('parameterName')?.hasError('notBlank')) {
+              <mat-error>{{ 'common.notBlank' | translate }}</mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'bpm-config.fields.min' | translate }}</mat-label>
+            <input
+              matInput
+              type="number"
+              formControlName="minValue"
+              step="any"
+              [min]="-maxLimit"
+              [max]="maxLimit"
+              placeholder="0.0">
+
+            @if (form.get('minValue')?.hasError('required')) {
+              <mat-error>{{ 'common.required' | translate }}</mat-error>
+            } @else if (form.get('minValue')?.hasError('min') || form.get('minValue')?.hasError('max')) {
+              <mat-error>{{ 'bpm-config.errors.limit' | translate }}</mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'bpm-config.fields.max' | translate }}</mat-label>
+            <input
+              matInput
+              type="number"
+              formControlName="maxValue"
+              step="any"
+              [min]="-maxLimit"
+              [max]="maxLimit"
+              placeholder="100.0">
+
+            @if (form.get('maxValue')?.hasError('required')) {
+              <mat-error>{{ 'common.required' | translate }}</mat-error>
+            } @else if (form.get('maxValue')?.hasError('min') || form.get('maxValue')?.hasError('max')) {
+              <mat-error>{{ 'bpm-config.errors.limit' | translate }}</mat-error>
+            } @else if (form.hasError('bpmRange') && form.get('maxValue')?.touched) {
+              <mat-error>{{ 'bpm-config.errors.range' | translate }}</mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>{{ 'bpm-config.fields.unit' | translate }}</mat-label>
+            <input
+              matInput
+              formControlName="unit"
+              maxlength="20"
+              [placeholder]="'bpm-config.placeholders.unit' | translate">
+
+            @if (form.get('unit')?.hasError('required')) {
+              <mat-error>{{ 'common.required' | translate }}</mat-error>
+            } @else if (form.get('unit')?.hasError('notBlank')) {
+              <mat-error>{{ 'common.notBlank' | translate }}</mat-error>
+            }
+          </mat-form-field>
+        </div>
+
+        @if (store.error()) {
+          <div class="error-msg">
+            <mat-icon>error</mat-icon>
+            <span>{{ store.error()! | translate }}</span>
+          </div>
+        }
+      </mat-card-content>
+
+      <mat-card-actions align="end">
+        <button
+          mat-button
+          type="button"
+          [routerLink]="['/equipments/equipment-detail', equipmentId()]">
+          {{ 'common.cancel' | translate }}
+        </button>
+
+        <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid || store.saving()">
+          @if (store.saving()) {
+            <mat-spinner diameter="18"></mat-spinner>
+          } @else {
+            <mat-icon>settings_suggest</mat-icon>
+          }
+
+          {{ 'common.save' | translate }}
+        </button>
+      </mat-card-actions>
+    </form>
+  </mat-card>
+</div>

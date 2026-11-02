@@ -1,0 +1,15 @@
+:host {
+  display: inline-flex;
+}
+
+.sign-out-button {
+  width: 34px !important;
+  height: 34px !important;
+  color: #006d67 !important;
+}
+
+.sign-out-button mat-icon {
+  width: 19px;
+  height: 19px;
+  font-size: 19px;
+}

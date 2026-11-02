@@ -1,0 +1,220 @@
+@startuml equipment-frontend-diagram
+
+title QualiTrack - Equipment Frontend Class Diagram
+
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+hide empty members
+
+package "shared" {
+  interface BaseEntity
+  class BaseApi
+  class BaseApiEndpoint
+  interface BaseAssembler
+  class ApiError
+}
+
+package "iam.application" {
+  class IamStore {
+    +requireLaboratoryId(): number
+    +canManageQuality: Signal<boolean>
+  }
+}
+
+package "equipment.domain.model" {
+  class Equipment {
+    +id: number
+    +labId: number
+    +environmentId: number | null
+    +name: string
+    +type: string
+    +model: string
+    +serialNumber: string
+    +status: EquipmentStatus
+    +deviceType: IotDeviceType | null
+    +sensorExternalId: string | null
+    +firmwareVersion: string | null
+    +isIotDevice: boolean
+    +isLocated: boolean
+  }
+  enum IotDeviceType {
+    ENVIRONMENTAL_DEVICE
+    CONTAINER_MONITOR
+  }
+  enum EquipmentStatus {
+    OPERATIONAL
+    MAINTENANCE
+    OUT_OF_SERVICE
+    INACTIVE
+  }
+  class MaintenanceRecord {
+    +id: number
+    +equipmentId: number
+    +environmentId: number | null
+    +maintenanceDate: string
+    +technicianName: string
+    +description: string
+    +type: string
+  }
+  class BpmParameterConfig
+  interface RegisterEquipmentCommand
+  interface RegisterIotDeviceCommand
+  interface ChangeEquipmentStatusCommand
+  interface RegisterMaintenanceCommand
+  interface ConfigureBpmCommand
+  class InstallationEnvironment {
+    +id / code / name
+    +usage: string | null
+  }
+  class MaintenanceTechnician {
+    +id / fullName / role
+    +active: boolean
+    +accessRole: string | null
+    +userId: number | null
+    +assignable: boolean
+  }
+}
+
+Equipment ..|> BaseEntity
+MaintenanceRecord ..|> BaseEntity
+BpmParameterConfig ..|> BaseEntity
+Equipment --> IotDeviceType
+Equipment --> EquipmentStatus
+note right of Equipment
+  An IoT device is an equipment with a device type and the identity
+  Edge uses to recognise it. Only IoT devices send telemetry.
+end note
+
+package "equipment.infrastructure" {
+  class EquipmentApi {
+    +getEquipment(lab)
+    +getEquipmentById(lab, equipmentId)
+    +registerEquipment(lab, request)
+    +registerDevice(lab, deviceType, request)
+    +assignToEnvironment(lab, environmentId, equipment)
+    +changeStatus(lab, environmentId, equipmentId, request)
+    +getMaintenanceHistory(lab, environmentId, equipmentId)
+    +registerMaintenance(lab, environmentId, equipmentId, request)
+    +getBpmConfig(lab, equipmentId)
+    +configureBpm(lab, request)
+    +getEnvironments(lab)
+    +getTechnicians(lab)
+  }
+  class EquipmentApiEndpoint
+  class MaintenanceApiEndpoint
+  class BpmConfigApiEndpoint
+  class EquipmentAssembler
+  class MaintenanceAssembler
+  class BpmConfigAssembler
+  class InstallationEnvironmentApiEndpoint
+  class InstallationEnvironmentAssembler
+  class MaintenanceTechnicianApiEndpoint
+  class MaintenanceTechnicianAssembler
+}
+
+EquipmentApi --|> BaseApi
+EquipmentApi --> EquipmentApiEndpoint
+EquipmentApi --> MaintenanceApiEndpoint
+EquipmentApi --> BpmConfigApiEndpoint
+EquipmentApiEndpoint --|> BaseApiEndpoint
+MaintenanceApiEndpoint --|> BaseApiEndpoint
+BpmConfigApiEndpoint --|> BaseApiEndpoint
+EquipmentApiEndpoint --> EquipmentAssembler
+MaintenanceApiEndpoint --> MaintenanceAssembler
+BpmConfigApiEndpoint --> BpmConfigAssembler
+EquipmentAssembler ..|> BaseAssembler
+EquipmentApi --> InstallationEnvironmentApiEndpoint
+EquipmentApi --> MaintenanceTechnicianApiEndpoint
+InstallationEnvironmentApiEndpoint --> InstallationEnvironmentAssembler
+InstallationEnvironmentAssembler ..> InstallationEnvironment
+MaintenanceTechnicianApiEndpoint --> MaintenanceTechnicianAssembler
+MaintenanceTechnicianAssembler ..> MaintenanceTechnician
+note bottom of InstallationEnvironmentApiEndpoint
+  Laboratory -> Equipment (Customer/Supplier):
+  GET /laboratories/{id}/environments and /staff in Equipment's own models.
+end note
+MaintenanceAssembler ..|> BaseAssembler
+BpmConfigAssembler ..|> BaseAssembler
+note right of EquipmentApiEndpoint
+  /laboratories/{laboratoryId}/equipments[/{equipmentId}]
+  /laboratories/{laboratoryId}/devices/{environmental-devices|container-monitors}
+  .../environments/{environmentId}/equipments
+  .../environments/{environmentId}/{environmental-devices|container-monitors}
+  .../environments/{environmentId}/equipments/{equipmentId}/status-changes
+end note
+note right of MaintenanceApiEndpoint
+  .../environments/{environmentId}/equipments/{equipmentId}/maintenance-records
+end note
+note bottom of BpmConfigApiEndpoint
+  /laboratories/{laboratoryId}/equipments/{equipmentId}/bpm-configs
+  PUT .../bpm-configs/{parameterName} creates or replaces the range: process
+  parameters of the equipment (Report); environmental thresholds live in Tracking.
+end note
+
+package "equipment.application" {
+  class EquipmentStore <<root>> {
+    +equipmentList: Signal<Equipment[]>
+    +selectedEquipment: Signal<Equipment>
+    +iotDevices: Signal<Equipment[]>
+    +processEquipment: Signal<Equipment[]>
+    +needsMaintenance: Signal<Equipment[]>
+    +maintenanceHistory: Signal<MaintenanceRecord[]>
+    +canManage: Signal<boolean>
+    +loadEquipment(labId?)
+    +loadEquipmentById(equipmentId)
+    +registerEquipment(command)
+    +registerDevice(command, environmentId)
+    +assignToEnvironment(equipment, environmentId)
+    +changeStatus(equipment, command)
+    +loadMaintenanceHistory(equipment)
+    +registerMaintenance(equipment, command)
+    +environments: Signal<InstallationEnvironment[]>
+    +loadEnvironments(): Promise<void>
+    +loadTechnicians(): Promise<MaintenanceTechnician[]>
+  }
+  class equipmentError <<function>>
+}
+
+EquipmentStore --> EquipmentApi
+EquipmentStore --> IamStore
+EquipmentStore ..> equipmentError
+equipmentError ..> ApiError
+
+package "equipment.presentation" {
+  class EquipmentList
+  class EquipmentForm
+  class DeviceForm
+  class EquipmentDetail
+  class MaintenanceForm
+  class BpmConfigForm
+  class EquipmentRoutes
+}
+
+EquipmentList --> EquipmentStore
+EquipmentForm --> EquipmentStore
+DeviceForm --> EquipmentStore
+EquipmentDetail --> EquipmentStore
+MaintenanceForm --> EquipmentStore
+MaintenanceForm --> IamStore
+note right of MaintenanceForm
+  The technician is chosen from the active operators of the laboratory;
+  an operator can only choose themselves (technicianStaffId).
+  Status changes, maintenance and BPM limits are hidden for auditors.
+end note
+BpmConfigForm --> EquipmentStore
+
+note bottom of EquipmentRoutes
+  /equipments/equipment-list: summary (process equipment, IoT devices, in maintenance
+  or out of service), search and filters by kind and attention, like the inventory
+  /equipments/register-equipment, /equipments/register-device
+  /equipments/equipment-detail/:id (location, status change, BPM, maintenance)
+  /equipments/maintenance-form/:id, /equipments/bpm-config-form/:id
+  /equipments/maintenance-history/:id redirects to the detail
+end note
+
+note left of EquipmentRoutes
+  Source: equipment/presentation/equipment.routes.ts
+  Public paths and guards remain unchanged.
+end note
+
+@enduml

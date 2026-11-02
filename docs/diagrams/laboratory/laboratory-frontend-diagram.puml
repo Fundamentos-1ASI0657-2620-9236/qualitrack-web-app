@@ -1,0 +1,202 @@
+@startuml laboratory-frontend-diagram
+
+title QualiTrack - Laboratory Frontend Class Diagram
+
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+hide empty members
+
+package "shared" {
+  interface BaseEntity
+  class BaseApi
+  class BaseApiEndpoint
+  class errorStatus <<function>>
+  interface BaseAssembler
+}
+
+package "iam.application" {
+  class IamStore {
+    +requireLaboratoryId(): number
+    +canManageQuality: Signal<boolean>
+  }
+}
+
+package "laboratory.domain.model" {
+  class Laboratory {
+    +id: number
+    +name: string
+    +ruc: string
+    +address: string
+    +phone: string
+    +applicableRegulations: string[]
+  }
+  class StaffMember {
+    +id: number
+    +laboratoryId: number
+    +fullName: string
+    +role: string
+    +email: string
+    +active: boolean
+    +accessRole: StaffAccessRole | null
+    +userId: number | null
+    +assignable: boolean
+  }
+  enum StaffAccessRole {
+    OPERATOR
+    AUDITOR
+  }
+  class StaffCredentials <<type>> {
+    +username: string
+    +delivery: 'EMAIL' | 'SHOWN_ONCE'
+    +temporaryPassword: string | null
+  }
+  class RegisteredStaff <<type>> {
+    +staffMember: StaffMember
+    +credentials: StaffCredentials
+  }
+  class Environment {
+    +id: number
+    +laboratoryId: number
+    +code: string
+    +name: string
+    +description: string | null
+    +usage: EnvironmentUsage | null
+  }
+  enum EnvironmentUsage {
+    LABORATORY
+    PRODUCTION
+    RAW_MATERIAL_STORAGE
+    PRODUCT_STORAGE
+    OTHER
+  }
+  interface CreateLaboratoryCommand
+  interface UpdateLaboratoryCommand
+  interface RegisterStaffCommand
+  interface RegisterEnvironmentCommand
+  interface UpdateEnvironmentCommand
+}
+
+Laboratory ..|> BaseEntity
+StaffMember ..|> BaseEntity
+StaffMember --> StaffAccessRole
+RegisteredStaff --> StaffMember
+RegisteredStaff --> StaffCredentials
+Environment ..|> BaseEntity
+Environment --> EnvironmentUsage
+
+package "laboratory.infrastructure" {
+  class LaboratoryApi {
+    +createLaboratory(request)
+    +getLaboratory(laboratoryId)
+    +updateLaboratory(laboratoryId, request)
+    +getStaff(laboratoryId)
+    +getStaffMember(laboratoryId, staffId)
+    +registerStaff(laboratoryId, request): Observable<RegisteredStaff>
+    +deactivateStaff(laboratoryId, staffId): Observable<StaffMember>
+    +getEnvironments(laboratoryId)
+    +getEnvironment(laboratoryId, environmentId)
+    +createEnvironment(laboratoryId, request)
+    +updateEnvironment(laboratoryId, environmentId, request)
+    +assignUsage(laboratoryId, environmentId, request)
+  }
+  class LaboratoryApiEndpoint
+  class StaffApiEndpoint
+  class EnvironmentApiEndpoint
+  class LaboratoryAssembler
+  class StaffAssembler
+  class EnvironmentAssembler
+}
+
+LaboratoryApi --|> BaseApi
+LaboratoryApi --> LaboratoryApiEndpoint
+LaboratoryApi --> StaffApiEndpoint
+LaboratoryApi --> EnvironmentApiEndpoint
+LaboratoryApiEndpoint --|> BaseApiEndpoint
+StaffApiEndpoint --|> BaseApiEndpoint
+EnvironmentApiEndpoint --|> BaseApiEndpoint
+LaboratoryApiEndpoint --> LaboratoryAssembler
+StaffApiEndpoint --> StaffAssembler
+EnvironmentApiEndpoint --> EnvironmentAssembler
+note bottom of StaffApiEndpoint
+  GET/POST /laboratories/{laboratoryId}/staff, GET .../staff/{staffId},
+  POST .../staff/{staffId}/deactivations
+end note
+
+package "laboratory.application" {
+  class LaboratoryStore {
+    +laboratory: Signal<Laboratory>
+    +staffList: Signal<StaffMember[]>
+    +activeStaff
+    +loadLaboratory(laboratoryId)
+    +createLaboratory(command)
+    +updateLaboratory(laboratoryId, command)
+    +loadStaff(laboratoryId)
+    +staffMember(laboratoryId, staffId): Observable<StaffMember>
+    +registerStaff(laboratoryId, command): Observable<RegisteredStaff>
+    +deactivateStaff(laboratoryId, staffId): Observable<StaffMember>
+    +environments: Signal<Environment[]>
+    +environmentsLoading / environmentError / environmentsEmpty
+    +canManageEnvironments: Signal<boolean>
+    +loadEnvironments()
+    +loadEnvironment(environmentId)
+    +registerEnvironment(command)
+    +updateEnvironment(environmentId, command)
+    +assignEnvironmentUsage(environmentId, usage)
+  }
+}
+
+LaboratoryStore --> LaboratoryApi
+LaboratoryStore --> IamStore
+note right of LaboratoryStore
+  Single store of the context (application/laboratory.store.ts).
+  The other contexts read environments and staff through their
+  own models; each one remembers its environment in this browser.
+end note
+
+package "laboratory.presentation" {
+  class LabForm
+  class LabProfile
+  class EnvironmentList
+  class EnvironmentForm
+  class StaffList
+  class StaffForm
+  class StaffDetail
+  class LaboratoryRoutes
+}
+
+LabForm --> LaboratoryStore
+LabProfile --> LaboratoryStore
+EnvironmentList --> LaboratoryStore
+EnvironmentForm --> LaboratoryStore
+StaffList --> LaboratoryStore
+StaffForm --> LaboratoryStore
+StaffForm ..> errorStatus
+StaffForm ..> RegisteredStaff
+StaffList --> IamStore
+StaffDetail --> LaboratoryStore
+StaffDetail ..> OperationsPage
+note right of StaffForm
+  Quality managers register operators and auditors; the credentials are e-mailed
+  or shown once (username and temporary password) when the e-mail cannot be sent.
+end note
+note right of StaffDetail
+  Laboratory data and deactivation only. Navigation links open
+  /profile/staff/:staffId (quality managers with a staff account) and
+  /reports/staff-activity/:staffId (quality managers and auditors).
+  No Profile or Reporting & Audit code is imported.
+end note
+
+note bottom of LaboratoryRoutes
+  /laboratories/lab-profile, environments[/new|/:environmentId/edit],
+  staff-list, staff-form (quality managers), staff/:staffId (quality managers and auditors),
+  raw-materials/:id redirects to /inventory/legacy-materials/:id.
+  product-catalog and product-form redirect to /batches;
+  raw-material-list and raw-material-form redirect to /inventory.
+end note
+
+note left of LaboratoryRoutes
+  Source: laboratory/presentation/laboratory.routes.ts
+  Public paths and guards remain unchanged.
+end note
+
+@enduml

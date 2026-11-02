@@ -1,0 +1,54 @@
+<main class="operations-page">
+  <!-- Back link to the batch -->
+  <a [routerLink]="batchLink">{{ 'batch-detail.title' | translate }}</a>
+  <header class="page-heading">
+    <h1><mat-icon aria-hidden="true">cancel</mat-icon>{{ 'batch-reject.title' | translate }}</h1>
+  </header>
+  <p class="muted">{{ 'batch-reject.notice' | translate }}</p>
+  <!-- Notice for users who cannot reject batches -->
+  @if (!store.canDecide()) {
+    <p class="notice" role="status">{{ 'batch-release.quality-only' | translate }}</p>
+  }
+  @if (store.error()) {
+    <p class="error" role="alert">{{ store.error()! | translate }}</p>
+  }
+  <!-- Rejection form -->
+  <form class="editor form-grid" [formGroup]="form" (ngSubmit)="submit()">
+    <!-- Rejection date -->
+    <mat-form-field appearance="outline">
+      <mat-label>{{ 'batch-reject.fields.rejection-date' | translate }}</mat-label>
+      <input matInput type="date" formControlName="rejectionDate" [attr.min]="minDate" [attr.max]="maxDate" />
+      @if (form.controls.rejectionDate.hasError('required')) {
+        <mat-error>{{ 'common.required' | translate }}</mat-error>
+      } @else if (form.controls.rejectionDate.hasError('invalidDate')) {
+        <mat-error>{{ 'common.dateInvalid' | translate }}</mat-error>
+      } @else if (form.controls.rejectionDate.hasError('minDate')) {
+        <mat-error>{{ 'common.dateMin' | translate }}</mat-error>
+      } @else if (form.controls.rejectionDate.hasError('futureDate')) {
+        <mat-error>{{ 'common.dateFuture' | translate }}</mat-error>
+      } @else if (form.controls.rejectionDate.hasError('dateOrder')) {
+        <mat-error>{{ 'common.dateBeforeBatchStart' | translate }}</mat-error>
+      }
+    </mat-form-field>
+    <!-- Reason of the rejection, required and auditable -->
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>{{ 'batch-reject.fields.reason' | translate }}</mat-label>
+      <textarea matInput formControlName="reason" rows="4" maxlength="500"
+                [placeholder]="'batch-reject.placeholders.reason' | translate"></textarea>
+      @if (form.controls.reason.hasError('required')) {
+        <mat-error>{{ 'common.required' | translate }}</mat-error>
+      } @else if (form.controls.reason.hasError('notBlank')) {
+        <mat-error>{{ 'common.notBlank' | translate }}</mat-error>
+      } @else if (form.controls.reason.hasError('minlength')) {
+        <mat-error>{{ 'batch-reject.errors.reason-minlength' | translate }}</mat-error>
+      }
+    </mat-form-field>
+    <!-- Actions: the submit button is disabled for users who cannot reject -->
+    <div class="actions full-width">
+      <a mat-button [routerLink]="batchLink">{{ 'common.cancel' | translate }}</a>
+      <button mat-flat-button color="warn" type="submit" [disabled]="store.saving() || !store.canDecide()">
+        <mat-icon>cancel</mat-icon>{{ 'batch-reject.actions.submit' | translate }}
+      </button>
+    </div>
+  </form>
+</main>

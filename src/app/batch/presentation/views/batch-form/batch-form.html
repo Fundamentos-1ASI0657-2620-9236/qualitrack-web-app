@@ -1,0 +1,78 @@
+<main class="operations-page">
+  <!-- Back link to the product -->
+  <a [routerLink]="productLink">{{ store.product()?.name || ('product-catalog.title' | translate) }}</a>
+  <header class="page-heading">
+    <h1><mat-icon aria-hidden="true">add_box</mat-icon>{{ 'batch-form.title' | translate }}</h1>
+  </header>
+  <p class="muted">{{ 'batch-form.subtitle' | translate }}</p>
+  @if (store.error()) {
+    <p class="error" role="alert">{{ store.error()! | translate }}</p>
+  }
+  <!-- Registration form of the batch -->
+  <form class="editor form-grid" [formGroup]="form" (ngSubmit)="save()">
+    <!-- Traceability code, unique in the laboratory -->
+    <mat-form-field appearance="outline">
+      <mat-label>{{ 'batch-form.fields.batch-number' | translate }}</mat-label>
+      <input matInput formControlName="batchNumber" maxlength="50" autocomplete="off"
+             [placeholder]="'batch-form.placeholders.batch-number' | translate" />
+      <mat-hint>{{ 'batch-form.hints.batch-number' | translate }}</mat-hint>
+      @if (form.controls.batchNumber.hasError('required')) {
+        <mat-error>{{ 'common.required' | translate }}</mat-error>
+      } @else if (form.controls.batchNumber.hasError('notBlank')) {
+        <mat-error>{{ 'common.notBlank' | translate }}</mat-error>
+      } @else if (form.controls.batchNumber.hasError('code')) {
+        <mat-error>{{ 'common.invalidCode' | translate }}</mat-error>
+      }
+    </mat-form-field>
+    <!-- Start date -->
+    <mat-form-field appearance="outline">
+      <mat-label>{{ 'batch-form.fields.start-date' | translate }}</mat-label>
+      <input matInput type="date" formControlName="startDate" [attr.min]="minDate" [attr.max]="maxDate" />
+      @if (form.controls.startDate.hasError('required')) {
+        <mat-error>{{ 'common.required' | translate }}</mat-error>
+      } @else if (form.controls.startDate.hasError('invalidDate')) {
+        <mat-error>{{ 'common.dateInvalid' | translate }}</mat-error>
+      } @else if (form.controls.startDate.hasError('minDate')) {
+        <mat-error>{{ 'common.dateMin' | translate }}</mat-error>
+      } @else if (form.controls.startDate.hasError('maxDate')) {
+        <mat-error>{{ 'common.dateTooFar' | translate }}</mat-error>
+      }
+    </mat-form-field>
+    <!-- Quantity to produce, greater than zero -->
+    <mat-form-field appearance="outline">
+      <mat-label>{{ 'batch-form.fields.quantity' | translate }}</mat-label>
+      <input matInput type="number" formControlName="quantity" min="0.001" [max]="maxQuantity" step="0.001" />
+      @if (form.controls.quantity.hasError('wholeUnits')) {
+        <mat-error>{{ 'batch-form.errors.whole-units' | translate }}</mat-error>
+      } @else if (form.controls.quantity.hasError('precision')) {
+        <mat-error>{{ 'batch-form.errors.precision' | translate }}</mat-error>
+      } @else if (form.controls.quantity.hasError('max')) {
+        <mat-error>{{ 'batch-form.errors.quantity-max' | translate }}</mat-error>
+      } @else if (form.controls.quantity.invalid) {
+        <mat-error>{{ 'batch-form.errors.quantity-min' | translate }}</mat-error>
+      }
+    </mat-form-field>
+    <!-- Production unit -->
+    <mat-form-field appearance="outline">
+      <mat-label>{{ 'batch-form.fields.unit' | translate }}</mat-label>
+      <mat-select formControlName="unit">
+        @for (unit of units; track unit) {
+          <mat-option [value]="unit">{{ unit }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <!-- Optional manufacturing notes -->
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>{{ 'batch-form.fields.notes' | translate }}</mat-label>
+      <textarea matInput formControlName="notes" rows="3" maxlength="500"
+                [placeholder]="'batch-form.placeholders.notes' | translate"></textarea>
+    </mat-form-field>
+    <!-- Actions -->
+    <div class="actions full-width">
+      <a mat-button [routerLink]="productLink">{{ 'common.cancel' | translate }}</a>
+      <button mat-flat-button type="submit" [disabled]="store.saving()">
+        <mat-icon>save</mat-icon>{{ 'common.register' | translate }}
+      </button>
+    </div>
+  </form>
+</main>

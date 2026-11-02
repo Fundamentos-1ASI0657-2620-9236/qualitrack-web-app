@@ -1,0 +1,204 @@
+@startuml shared-frontend-diagram
+title QualiTrack - Shared Frontend
+
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+
+package "external bounded contexts" <<External>> {
+  class IamStore
+  class AuthenticationSection
+}
+
+package "shared" {
+
+  package "domain.model" {
+    interface BaseEntity {
+      +id: number
+    }
+  }
+
+  package "infrastructure" {
+    interface BaseResource {
+      +id: number
+    }
+
+    interface BaseResponse
+
+
+    interface BaseAssembler<TEntity, TResource, TResponse> {
+      +toEntityFromResource(resource: TResource): TEntity
+      +toResourceFromEntity(entity: TEntity): TResource
+      +toEntitiesFromResponse(response: TResponse): TEntity[]
+    }
+
+    abstract class BaseApi {
+    }
+
+    class ApiError {
+      +status: number
+      +details?: string
+    }
+
+    class EnvironmentPreference {
+      +choose(laboratoryId, environments, preferredUsage?)
+      +remember(laboratoryId, environmentId): void
+      +read(laboratoryId): number | null
+    }
+
+    class errorStatus <<function>> {
+      +errorStatus(error: unknown): number | null
+    }
+
+    abstract class ErrorHandlingEnabledBaseType {
+      #handleError(operation: string): Function
+    }
+
+    abstract class BaseApiEndpoint<TEntity, TResource, TResponse, TAssembler> {
+      #http: HttpClient
+      #endpointUrl: string
+      #assembler: TAssembler
+      +getAll(): Observable<TEntity[]>
+      +getById(id: number): Observable<TEntity>
+      +create(entity: TEntity): Observable<TEntity>
+      +update(entity: TEntity, id: number): Observable<TEntity>
+      +delete(id: number): Observable<void>
+    }
+  }
+
+  package "presentation.components" {
+    class EnvironmentSelector {
+      +environments: InputSignal<EnvironmentOption[]>
+      +selectedId: InputSignal<number | null>
+      +selectedChange: OutputEmitterRef<number>
+    }
+
+    interface EnvironmentOption {
+      +id: number
+      +code: string
+      +name: string
+      +usage?: string | null
+    }
+
+    class LanguageSwitcher {
+      #currentLang: string
+      #languages: string[]
+      #translate: TranslateService
+      #compact: Signal<boolean>
+      +useLanguage(language: string): void
+    }
+
+    class Toolbar {
+      -iam: IamStore
+      #brandLink: Signal<string>
+      #brandLabel: Signal<string>
+    }
+
+    class Layout {
+      -router: Router
+      #sidenavMode: 'side' | 'over'
+      #sidenavOpened: boolean
+      -options: NavigationOption[]
+      #visibleOptions: Signal<NavigationOption[]>
+      #navigateTo(link: string): void
+      #isActive(link: string): boolean
+    }
+
+    class NavigationOption <<type>> {
+      +label: string
+      +icon: string
+      +link: string
+      +qualityOnly?: boolean
+      +children?: NavigationChild[]
+    }
+
+    class NavigationChild <<type>> {
+      +label: string
+      +link: string
+      +qualityOnly?: boolean
+    }
+    note bottom of NavigationChild
+      Entries marked qualityOnly (subscription, equipment and staff registration)
+      are only listed for quality managers.
+    end note
+  }
+
+  package "presentation.views" {
+    class Home {
+    }
+
+    class About {
+    }
+
+    class PageNotFound {
+      #invalidPath: string
+      -route: ActivatedRoute
+      -router: Router
+      +ngOnInit(): void
+      #navigateToHome(): void
+    }
+  }
+}
+
+BaseResource --|> BaseEntity
+BaseApiEndpoint --|> ErrorHandlingEnabledBaseType
+errorStatus ..> ApiError
+note bottom of EnvironmentPreference
+  Environment remembered in this browser per area (inventory, production,
+  tracking) under qualitrack.environment.{laboratoryId}.{scope}; each
+  bounded context passes its own environments.
+end note
+BaseApiEndpoint ..> BaseEntity
+BaseApiEndpoint ..> BaseResource
+BaseApiEndpoint ..> BaseResponse
+BaseApiEndpoint ..> BaseAssembler
+
+BaseAssembler ..> BaseEntity
+BaseAssembler ..> BaseResource
+BaseAssembler ..> BaseResponse
+
+package "iam.presentation.components" <<External>> {
+  class UserSessionSection
+}
+
+package "profile.presentation.components" <<External>> {
+  class UserProfileBadge
+}
+
+package "ca.presentation.components" <<External>> {
+  class NotificationBell
+}
+
+Toolbar --> LanguageSwitcher
+Layout --> LanguageSwitcher
+Layout --> UserProfileBadge
+Layout --> UserSessionSection
+Layout --> NotificationBell : with operational access
+Layout *-- NavigationOption
+Toolbar --> IamStore
+note bottom of Toolbar
+  Pages before signing in (home, about, sign-in, sign-up) and onboarding pages.
+  The logo and the name lead to /home without a session and to /dashboard with one.
+end note
+note bottom of Layout
+  The logo and the name lead to /dashboard. Menu labels only use nav.* keys:
+  English Title Case, Spanish sentence case, "Catalog" spelling.
+  The toolbar composes the notification bell (ca), profile badge (profile)
+  and sign-out action (iam). The badge photo and name open the profile.
+  The layout keeps both user widgets inside one capsule. Up to 720px the brand is hidden
+  so the user section stays complete; up to 480px the language switcher is
+  compact (no check mark).
+end note
+NavigationOption *-- NavigationChild
+
+Home --> Toolbar
+Home --> AuthenticationSection
+PageNotFound --> Router
+PageNotFound --> ActivatedRoute
+
+EnvironmentSelector ..> EnvironmentOption
+note bottom of EnvironmentSelector
+  Visual component without store: the views of inventory, products, alerts,
+  telemetry and reports pass the environments of their own context.
+end note
+
+@enduml

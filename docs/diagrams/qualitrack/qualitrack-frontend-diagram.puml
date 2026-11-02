@@ -1,0 +1,557 @@
+@startuml qualitrack-frontend-diagram
+title QualiTrack - Frontend Complete Diagram
+
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+
+package "qualitrack-frontend" {
+
+  class AppConfig <<ApplicationConfig>> {
+    +provideRouter(routes)
+    +provideHttpClient(authenticationInterceptor)
+    +provideTranslateService()
+    +provideCharts()
+  }
+
+  class AppRoutes <<Routes>> {
+    +home
+    +about
+    +dashboard
+    +iam
+    +laboratories
+    +equipments
+    +batches
+    +alerts
+    +reports
+    +tracking
+    +inventory
+    +subscriptions
+    +pageNotFound
+  }
+
+  package "shared" {
+    package "domain" {
+      interface BaseEntity
+    }
+
+    package "infrastructure" {
+      interface BaseResource
+      interface BaseResponse
+      interface BaseAssembler
+      abstract class BaseApi
+      abstract class BaseApiEndpoint
+      abstract class ErrorHandlingEnabledBaseType
+    }
+
+    package "presentation.components" {
+      class Layout
+      class Toolbar
+      class LanguageSwitcher
+      class EnvironmentSelector
+    }
+
+    package "presentation.views" {
+      class Home
+      class About
+      class PageNotFound
+    }
+  }
+
+  package "iam" {
+    package "domain" {
+      class User
+      interface SignInCommand
+      interface SignUpCommand
+      interface ResetPasswordCommand
+      interface UpdateAccountCommand
+    }
+
+    package "application" {
+      class IamStore
+    }
+
+    package "infrastructure" {
+      class IamApi
+      class SignInApiEndpoint
+      class SignUpApiEndpoint
+      class PasswordRecoveryApiEndpoint
+      class SignInAssembler
+      class SignUpAssembler
+      class authenticationInterceptor <<HttpInterceptorFn>>
+    }
+
+    package "presentation" {
+      class IamRoutes <<Routes>>
+      class SignInForm
+      class SignUpForm
+      class AuthenticationSection
+      class UserSessionSection
+    }
+  }
+
+  package "profile" {
+    package "domain" {
+      class Profile
+      interface UpdateProfileCommand
+    }
+
+    package "application" {
+      class ProfileStore
+    }
+
+    package "infrastructure" {
+      class ProfileApi
+      class ProfileApiEndpoint
+      class ProfileAssembler
+    }
+
+    package "presentation" {
+      class ProfileRoutes <<Routes>>
+      class ProfilePage
+    }
+  }
+
+  package "laboratory" {
+    package "domain" {
+      class Laboratory
+      class StaffMember
+      class PharmaceuticalProduct
+      class RawMaterial
+    }
+
+    package "application" {
+      class LaboratoryStore
+    }
+
+    package "infrastructure" {
+      class LaboratoryApi
+      class LaboratoryApiEndpoint
+      class StaffApiEndpoint
+      class ProductApiEndpoint
+      class RawMaterialApiEndpoint
+      class LaboratoryAssembler
+      class StaffAssembler
+      class ProductAssembler
+      class RawMaterialAssembler
+    }
+
+    package "presentation" {
+      class LaboratoryRoutes <<Routes>>
+      class LabProfile
+      class LaboratoryForm
+      class StaffList
+      class StaffForm
+      class ProductCatalog
+      class ProductForm
+      class RawMaterialList
+      class RawMaterialForm
+    }
+  }
+
+  package "inventory" {
+    package "domain" {
+      class "RawMaterial" as InvRawMaterial
+      class "RawMaterialBatch" as InvRawMaterialBatch
+      class "InventoryMovement" as InvInventoryMovement
+      interface "AvailableReceipt" as InvAvailableReceipt
+      class "LegacyMaterial" as InvLegacyMaterial
+    }
+    package "application" {
+      class "InventoryStore" as InvInventoryStore
+      class "ReceiptConsumptionStore" as InvReceiptConsumptionStore
+    }
+    package "infrastructure" {
+      class "InventoryApi" as InvInventoryApi
+      class "RawMaterialApiEndpoint" as InvRawMaterialApiEndpoint
+      class "RawMaterialBatchApiEndpoint" as InvRawMaterialBatchApiEndpoint
+      class "InventoryMovementApiEndpoint" as InvInventoryMovementApiEndpoint
+      class "LegacyInventoryApiEndpoint" as InvLegacyInventoryApiEndpoint
+      class "RawMaterialAssembler" as InvRawMaterialAssembler
+      class "RawMaterialBatchAssembler" as InvRawMaterialBatchAssembler
+      class "InventoryMovementAssembler" as InvInventoryMovementAssembler
+    }
+    package "presentation" {
+      class "inventoryRoutes" as InvinventoryRoutes
+      class "InventoryCatalogue" as InvInventoryCatalogue
+      class "RegisterMaterial" as InvRegisterMaterial
+      class "InventoryDetail" as InvInventoryDetail
+    }
+  }
+
+  package "equipment" {
+    package "domain" {
+      class Equipment
+      enum IotDeviceType
+      class BpmParameterConfig
+      class MaintenanceRecord
+    }
+
+    package "application" {
+      class EquipmentStore
+    }
+
+    package "infrastructure" {
+      class EquipmentApi
+      class EquipmentApiEndpoint
+      class BpmConfigApiEndpoint
+      class MaintenanceApiEndpoint
+      class EquipmentAssembler
+      class BpmConfigAssembler
+      class MaintenanceAssembler
+    }
+
+    package "presentation" {
+      class EquipmentRoutes <<Routes>>
+      class EquipmentList
+      class EquipmentForm
+      class DeviceForm
+      class EquipmentDetail
+      class MaintenanceForm
+      class BpmConfigForm
+    }
+  }
+
+  package "batch" {
+    package "domain" {
+      class Batch
+      class RawMaterialUsage
+      interface CreateBatchCommand
+      interface ReleaseBatchCommand
+      interface RejectBatchCommand
+      interface LinkRawMaterialCommand
+    }
+
+    package "application" {
+      class BatchStore
+    }
+
+    package "infrastructure" {
+      class BatchApi
+      class BatchApiEndpoint
+      class RawMaterialUsageApiEndpoint
+      class BatchAssembler
+      class RawMaterialUsageAssembler
+    }
+
+    package "presentation" {
+      class BatchRoutes <<Routes>>
+      class BatchList
+      class BatchForm
+      class BatchDetail
+      class BatchReleaseForm
+      class BatchRejectForm
+      class RawMaterialUsageComponent
+    }
+  }
+
+  package "ca" {
+    package "domain" {
+      class DeviationAlert
+      class ComplianceEvent
+      class NotificationPreference
+      class Notification
+    }
+
+    package "application" {
+      class CaStore
+    }
+
+    package "infrastructure" {
+      class CaApi
+      class AlertApiEndpoint
+      class ComplianceEventApiEndpoint
+      class NotificationPreferenceApiEndpoint
+      class NotificationApiEndpoint
+      class AlertAssembler
+      class ComplianceEventAssembler
+      class NotificationPreferenceAssembler
+    }
+
+    package "presentation" {
+      class CaRoutes <<Routes>>
+      class AlertDashboard
+      class AlertHistory
+      class NotificationBell
+      class NotificationPreferencesForm
+    }
+  }
+
+  package "ra" {
+    package "domain" {
+      class KpiDashboard
+      class KpiMetric
+      class DeviationTrend
+      class AuditLogEntry
+      class AuditReport
+    }
+
+    package "application" {
+      class RaStore
+    }
+
+    package "infrastructure" {
+      class RaApi
+      class KpiApiEndpoint
+      class DeviationTrendApiEndpoint
+      class ReportApiEndpoint
+      class AuditLogApiEndpoint
+      class KpiDashboardAssembler
+      class DeviationTrendAssembler
+      class AuditLogAssembler
+    }
+
+    package "presentation" {
+      class RaRoutes <<Routes>>
+      class Dashboard
+      class KpiDashboardComponent
+      class DeviationTrendChartComponent
+      class ReportGenerator
+      class AuditLog
+    }
+  }
+
+  package "tracking" {
+    package "domain" {
+      class Measurement
+      class ActuationEvent
+      class EnvironmentalProfile
+      class DeviceConnection
+    }
+
+    package "application" {
+      class TrackingStore
+    }
+
+    package "infrastructure" {
+      class TrackingApi
+      class MeasurementApiEndpoint
+      class ActuationEventApiEndpoint
+      class EnvironmentalProfileApiEndpoint
+      class DeviceConnectionApiEndpoint
+      class MeasurementAssembler
+      class ActuationEventAssembler
+      class EnvironmentalProfileAssembler
+      class DeviceConnectionAssembler
+    }
+
+    package "presentation" {
+      class TrackingRoutes <<Routes>>
+      class EnvironmentalMonitoring
+      class TelemetryHistory
+      class EnvironmentalProfiles
+      class ThresholdEditor
+      class ActuationRulesEditor
+    }
+  }
+
+  package "subscription" {
+    package "domain" {
+      class SubscriptionPlan
+      class Subscription
+      class Payment
+      interface SelectPlanCommand
+      interface CreateCheckoutSessionCommand
+    }
+
+    package "application" {
+      class SubscriptionStore
+    }
+
+    package "infrastructure" {
+      class SubscriptionApi
+      class SubscriptionApiEndpoint
+      class SubscriptionPlanAssembler
+      class SubscriptionAssembler
+      class PaymentAssembler
+      class CheckoutSessionAssembler
+    }
+
+    package "presentation" {
+      class SubscriptionRoutes <<Routes>>
+      class PlanList
+      class Checkout
+      class BillingSummary
+      class PaymentSuccess
+      class PaymentCancel
+    }
+  }
+}
+
+AppConfig --> AppRoutes
+AppConfig --> authenticationInterceptor
+
+AppRoutes --> Home
+AppRoutes --> About
+AppRoutes --> Layout
+AppRoutes --> Dashboard
+AppRoutes --> IamRoutes
+AppRoutes --> LaboratoryRoutes
+AppRoutes --> EquipmentRoutes
+AppRoutes --> BatchRoutes
+AppRoutes --> CaRoutes
+AppRoutes --> RaRoutes
+AppRoutes --> TrackingRoutes
+AppRoutes --> SubscriptionRoutes
+AppRoutes --> ProfileRoutes
+AppRoutes --> PageNotFound
+
+Layout --> LanguageSwitcher
+Layout --> NotificationBell
+Layout --> UserSessionSection
+UserSessionSection --> ProfileStore
+NotificationBell --> CaStore
+CaApi --> NotificationApiEndpoint
+NotificationApiEndpoint --|> BaseApiEndpoint
+ProfileRoutes ..> Layout
+ProfileRoutes --> ProfilePage
+ProfilePage --> ProfileStore
+ProfilePage --> IamStore : account and password
+ProfilePage *-- NotificationPreferencesForm
+NotificationPreferencesForm --> CaStore
+ProfileStore --> ProfileApi
+ProfileApi --> ProfileApiEndpoint
+ProfileApiEndpoint --> ProfileAssembler
+ProfileAssembler ..> Profile
+Toolbar --> LanguageSwitcher
+Home --> Toolbar
+Home --> AuthenticationSection
+
+Dashboard --> RaStore : operational overview with its own models (ACL)
+
+authenticationInterceptor --> IamStore
+
+IamStore --> IamApi
+IamApi --|> BaseApi
+IamApi --> SignInApiEndpoint
+IamApi --> SignUpApiEndpoint
+IamApi --> PasswordRecoveryApiEndpoint
+SignInApiEndpoint --|> ErrorHandlingEnabledBaseType
+SignUpApiEndpoint --|> ErrorHandlingEnabledBaseType
+ProfileApiEndpoint --|> ErrorHandlingEnabledBaseType
+SignInForm --> IamStore
+SignUpForm --> IamStore
+AuthenticationSection ..> IamRoutes
+
+LaboratoryStore --> LaboratoryApi
+LaboratoryApi --|> BaseApi
+LaboratoryApi --> LaboratoryApiEndpoint
+LaboratoryApi --> StaffApiEndpoint
+LaboratoryApi --> ProductApiEndpoint
+LaboratoryApi --> RawMaterialApiEndpoint
+LaboratoryApiEndpoint --|> BaseApiEndpoint
+StaffApiEndpoint --|> BaseApiEndpoint
+ProductApiEndpoint --|> BaseApiEndpoint
+RawMaterialApiEndpoint --|> BaseApiEndpoint
+
+EquipmentStore --> EquipmentApi
+EquipmentApi --|> BaseApi
+EquipmentApi --> EquipmentApiEndpoint
+EquipmentApi --> BpmConfigApiEndpoint
+EquipmentApi --> MaintenanceApiEndpoint
+EquipmentApiEndpoint --|> BaseApiEndpoint
+BpmConfigApiEndpoint --|> BaseApiEndpoint
+MaintenanceApiEndpoint --|> BaseApiEndpoint
+
+BatchStore --> BatchApi
+BatchApi --|> BaseApi
+BatchApi --> BatchApiEndpoint
+BatchApi --> RawMaterialUsageApiEndpoint
+BatchApiEndpoint --|> BaseApiEndpoint
+RawMaterialUsageApiEndpoint --|> BaseApiEndpoint
+
+CaStore --> CaApi
+CaApi --|> BaseApi
+CaApi --> AlertApiEndpoint
+CaApi --> ComplianceEventApiEndpoint
+CaApi --> NotificationPreferenceApiEndpoint
+AlertApiEndpoint --|> BaseApiEndpoint
+ComplianceEventApiEndpoint --|> BaseApiEndpoint
+NotificationPreferenceApiEndpoint --|> BaseApiEndpoint
+
+RaStore --> RaApi
+RaApi --|> BaseApi
+RaApi --> KpiApiEndpoint
+RaApi --> DeviationTrendApiEndpoint
+RaApi --> ReportApiEndpoint
+RaApi --> AuditLogApiEndpoint
+KpiApiEndpoint --|> BaseApiEndpoint
+DeviationTrendApiEndpoint --|> BaseApiEndpoint
+AuditLogApiEndpoint --|> BaseApiEndpoint
+
+TrackingStore --> TrackingApi
+TrackingApi --> MeasurementApiEndpoint
+TrackingApi --> ActuationEventApiEndpoint
+TrackingApi --> EnvironmentalProfileApiEndpoint
+TrackingApi --> DeviceConnectionApiEndpoint
+MeasurementApiEndpoint --|> BaseApiEndpoint
+ActuationEventApiEndpoint --|> BaseApiEndpoint
+EnvironmentalProfileApiEndpoint --|> BaseApiEndpoint
+DeviceConnectionApiEndpoint --|> BaseApiEndpoint
+
+SubscriptionStore --> SubscriptionApi
+SubscriptionApi --|> BaseApi
+SubscriptionApi --> SubscriptionApiEndpoint
+SubscriptionApiEndpoint --|> ErrorHandlingEnabledBaseType
+
+BaseApiEndpoint --|> ErrorHandlingEnabledBaseType
+BaseApiEndpoint ..> BaseAssembler
+BaseApiEndpoint ..> BaseEntity
+BaseApiEndpoint ..> BaseResource
+BaseApiEndpoint ..> BaseResponse
+
+AppRoutes --> InvinventoryRoutes
+InvinventoryRoutes ..> Layout
+InvinventoryRoutes ..> InvInventoryCatalogue
+InvinventoryRoutes ..> InvRegisterMaterial
+InvinventoryRoutes ..> InvInventoryDetail
+InvInventoryCatalogue --> InvInventoryStore
+InvRegisterMaterial --> InvInventoryStore
+InvInventoryDetail --> InvInventoryStore
+InvInventoryStore --> IamStore
+InvInventoryStore --> BatchApi : legacy history
+InvInventoryStore --> InvInventoryApi
+InvReceiptConsumptionStore --> IamStore
+InvReceiptConsumptionStore --> InvInventoryApi
+RawMaterialUsageComponent --> InvReceiptConsumptionStore : consume reviewed receipt
+InvInventoryApi --|> BaseApi
+InvInventoryApi --> InvRawMaterialApiEndpoint
+InvInventoryApi --> InvRawMaterialBatchApiEndpoint
+InvInventoryApi --> InvInventoryMovementApiEndpoint
+InvInventoryApi --> InvLegacyInventoryApiEndpoint
+InvRawMaterialApiEndpoint --|> BaseApiEndpoint
+InvRawMaterialBatchApiEndpoint --|> BaseApiEndpoint
+InvInventoryMovementApiEndpoint --|> BaseApiEndpoint
+InvLegacyInventoryApiEndpoint --|> ErrorHandlingEnabledBaseType
+InvRawMaterialApiEndpoint --> InvRawMaterialAssembler
+InvRawMaterialBatchApiEndpoint --> InvRawMaterialBatchAssembler
+InvInventoryMovementApiEndpoint --> InvInventoryMovementAssembler
+InvRawMaterialAssembler ..|> BaseAssembler
+InvRawMaterialBatchAssembler ..|> BaseAssembler
+InvInventoryMovementAssembler ..|> BaseAssembler
+InvRawMaterial ..|> BaseEntity
+InvRawMaterialBatch ..|> BaseEntity
+InvInventoryMovement ..|> BaseEntity
+InvAvailableReceipt --|> BaseEntity
+InvLegacyMaterial ..|> BaseEntity
+InvRawMaterial "1" <-- "0..*" InvRawMaterialBatch : rawMaterialId
+InvRawMaterialBatch "1" <-- "0..*" InvInventoryMovement : receiptId
+
+note bottom of InvInventoryApi
+  Uses the normal environment.serverBasePath and inventory endpoint paths.
+end note
+note bottom of InvRegisterMaterial
+  Dedicated registration form; catalogue and detail are separate routes.
+end note
+note bottom of RawMaterial
+  Laboratory legacy model retained for historical records.
+  New catalogue, receipts and stock movements belong to Inventory.
+end note
+
+PasswordRecoveryApiEndpoint --|> ErrorHandlingEnabledBaseType
+ReportApiEndpoint --|> ErrorHandlingEnabledBaseType
+note right of AppRoutes
+  Each context defines its routes in presentation/<bc>.routes.ts.
+  Public URLs and guards are preserved.
+end note
+
+@enduml

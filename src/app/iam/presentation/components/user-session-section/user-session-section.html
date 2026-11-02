@@ -1,0 +1,11 @@
+@if (store.isSignedIn()) {
+  <button
+    mat-icon-button
+    type="button"
+    class="sign-out-button"
+    [matTooltip]="'profile.sign-out' | translate"
+    [attr.aria-label]="'profile.sign-out' | translate"
+    (click)="signOut()">
+    <mat-icon>logout</mat-icon>
+  </button>
+}

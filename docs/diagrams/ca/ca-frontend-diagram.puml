@@ -1,0 +1,522 @@
+@startuml ca-frontend-diagram
+
+title QualiTrack - Compliance and Alerts Frontend Class Diagram
+
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+hide empty members
+
+package "shared" {
+  class EnvironmentSelector <<component>>
+  interface BaseEntity
+  class BaseApi
+  class BaseApiEndpoint
+  interface BaseAssembler
+  interface BaseResource
+  interface BaseResponse
+  class ApiError
+  class "operations-page.css" as OperationsPage <<stylesheet>>
+}
+
+package "iam.application" {
+  class IamStore {
+    +requireLaboratoryId(): number
+    +currentUserId()
+    +canOperate: Signal<boolean>
+  }
+}
+
+package "@angular/cdk" {
+  class CdkConnectedOverlay
+}
+
+package "shared.infrastructure" {
+  class EnvironmentPreference {
+    +choose(laboratoryId, environments, preferredUsage?)
+    +remember(laboratoryId, environmentId): void
+  }
+}
+
+package "ca.domain.model" {
+  class AlertDevice {
+    +id: number
+    +name: string
+  }
+  class AlertEnvironment {
+    +id / code / name
+    +usage: string | null
+  }
+  class DeviationAlert {
+    +id: number
+    +laboratoryId: number | null
+    +environmentId: number | null
+    +origin: "ENVIRONMENT | CONTAINER" | null
+    +equipmentId: number
+    +batchId: number | null
+    +measurementId: number | null
+    +lastMeasurementId: number | null
+    +parameterName: string
+    +recordedValue: number
+    +thresholdValue: number
+    +unit: string
+    +timestamp: string
+    +severity: "LOW | WARNING | CRITICAL"
+    +status: "UNRESOLVED | ACKNOWLEDGED | RESOLVED"
+    +deviationCount: number
+    +lastDetectedAt: string | null
+    +normalizedAt: string | null
+    +acknowledgedBy / acknowledgedAt
+    +resolvedBy / resolvedAt / resolutionNotes
+    +relatedActuations: RelatedActuation[]
+    +isOpen: boolean
+    +isNormalized: boolean
+  }
+
+  interface RelatedActuation {
+    +id: number
+    +action: string
+    +triggerState: string | null
+    +result: string
+    +occurredAt: string
+  }
+
+  class ComplianceEvent {
+    +id: number
+    +relatedEntityId: number
+    +eventType: string
+    +description: string
+    +timestamp: string
+    +resolvedBy?: number
+    +createdAt?: string
+  }
+
+  class NotificationPreference {
+    +id: number
+    +userId: number
+    +emailEnabled: boolean
+    +inAppEnabled: boolean
+    +minimumSeverity: "LOW | WARNING | CRITICAL"
+    +createdAt?: string
+  }
+
+  interface UpdateNotificationPreferenceCommand {
+    +emailEnabled: boolean
+    +inAppEnabled: boolean
+    +minimumSeverity: "LOW | WARNING | CRITICAL"
+  }
+
+  class Notification {
+    +id: number
+    +type: NotificationType
+    +severity: AlertSeverity | null
+    +subjectType: "ALERT | BATCH"
+    +subjectId: number
+    +environmentName / subjectName / parameterName
+    +recordedValue / unit
+    +actorName / note
+    +occurredAt: string
+    +readAt: string | null
+    +isRead: boolean
+    +link: string[]
+    +icon: string
+  }
+
+  enum NotificationType {
+    ALERT_OPENED
+    ALERT_ESCALATED
+    ALERT_ACKNOWLEDGED
+    ALERT_RESOLVED
+    BATCH_RELEASED
+    BATCH_REJECTED
+  }
+}
+
+Notification --> NotificationType
+
+DeviationAlert --> "0..*" RelatedActuation
+
+package "ca.application" {
+  class CaStore {
+    +alerts
+    +selectedAlert
+    +complianceEvents
+    +preference
+    +devices
+    +loading
+    +saving
+    +error
+    +notice
+    +noticeParams
+    +openAlertsCount
+    +criticalAlertsCount
+    +acknowledgedAlertsCount
+    +canAttend
+
+    +getAlertById(id: number)
+    +deviceName(equipmentId: number): string | null
+    +loadDevices(): void
+    +environments: Signal<AlertEnvironment[]>
+    +environmentsLoaded / environmentsEmpty
+    +loadEnvironments(): Promise<void>
+    +preferredEnvironmentId(): number | null
+    +rememberEnvironment(environmentId): void
+    +loadEnvironmentAlerts(environmentId: number, filters?: AlertFilters): void
+    +loadAlertById(alertId: number): void
+    +acknowledgeAlert(alertId: number): void
+    +resolveAlert(alertId: number, request: ResolveAlertRequest): void
+    +sendAlertEmailNotification(alertId: number): void
+    +loadEquipmentComplianceEvents(equipmentId: number): void
+    +loadBatchComplianceEvents(batchId: number): void
+    +loadNotificationPreferences(): void
+    +updateNotificationPreferences(request: UpdateNotificationPreferenceRequest): Observable<NotificationPreference>
+    +unreadNotifications: Signal<number>
+    +notifications: Signal<Notification[]>
+    +notificationsLoading / notificationsFailed / hasUnreadNotifications
+    +refreshUnreadNotifications(): Observable<number>
+    +loadLatestNotifications(): void
+    +markNotificationAsRead(notification: Notification): void
+    +markAllNotificationsAsRead(): void
+  }
+  class alertError <<function>>
+}
+
+package "ca.infrastructure" {
+  class AlertDeviceApiEndpoint {
+    +getDevices(laboratoryId)
+  }
+  class AlertDeviceAssembler
+  class AlertEnvironmentApiEndpoint {
+    +getEnvironments(laboratoryId)
+  }
+  class AlertEnvironmentAssembler
+  class CaApi {
+    -_alertEndpoint: AlertApiEndpoint
+    -_complianceEventEndpoint: ComplianceEventApiEndpoint
+    -_preferenceEndpoint: NotificationPreferenceApiEndpoint
+    -_notificationEndpoint: NotificationApiEndpoint
+
+    +getEnvironmentAlerts(laboratoryId: number, environmentId: number, filters?: AlertFilters)
+    +getAlertById(alertId: number)
+    +acknowledgeAlert(alertId: number)
+    +resolveAlert(alertId: number, request: ResolveAlertRequest)
+    +getEquipmentComplianceEvents(laboratoryId: number, equipmentId: number)
+    +getBatchComplianceEvents(batchId: number)
+    +sendAlertEmailNotification(alertId: number)
+    +getPreferences()
+    +updatePreferences(request: UpdateNotificationPreferenceRequest)
+    +getNotifications(unreadOnly: boolean, limit: number)
+    +getUnreadNotificationCount()
+    +markNotificationAsRead(notificationId: number)
+    +markAllNotificationsAsRead()
+  }
+
+  class AlertApiEndpoint {
+    +getEnvironmentAlerts(laboratoryId: number, environmentId: number, filters?: AlertFilters)
+    +getAlertById(alertId: number)
+    +acknowledgeAlert(alertId: number)
+    +resolveAlert(alertId: number, request: ResolveAlertRequest)
+    +sendEmailNotification(alertId: number)
+  }
+
+  interface AlertFilters {
+    +status?: AlertStatus
+    +severity?: AlertSeverity
+    +deviceId?: number
+    +active?: boolean
+  }
+
+  class ComplianceEventApiEndpoint {
+    +getEquipmentEvents(laboratoryId: number, equipmentId: number)
+    +getBatchEvents(batchId: number)
+  }
+
+  class NotificationPreferenceApiEndpoint {
+    +getPreferences()
+    +updatePreferences(request: UpdateNotificationPreferenceRequest)
+  }
+
+  class NotificationApiEndpoint {
+    +getNotifications(unreadOnly: boolean, limit: number)
+    +getUnreadCount()
+    +markAsRead(notificationId: number)
+    +markAllAsRead()
+  }
+
+  class AlertAssembler
+  class ComplianceEventAssembler
+  class NotificationPreferenceAssembler
+  class NotificationAssembler
+
+  interface AlertResource {
+    +id, laboratoryId, environmentId, origin
+    +equipmentId, batchId, measurementId, lastMeasurementId
+    +parameterName, recordedValue, thresholdValue, unit, timestamp
+    +severity, status, deviationCount, lastDetectedAt, normalizedAt
+    +acknowledgedBy, acknowledgedAt, resolvedBy, resolvedAt, resolutionNotes
+  }
+
+  interface AlertDetailResource {
+    +relatedActuations: RelatedActuationResource[]
+  }
+
+  interface RelatedActuationResource
+
+  interface AlertsResponse {
+    +alerts: AlertResource[]
+  }
+
+  interface ComplianceEventResource {
+    +id: number
+    +relatedEntityId: number
+    +eventType: string
+    +description: string
+    +timestamp: string
+    +resolvedBy?: number
+    +createdAt?: string
+  }
+
+  interface ComplianceEventsResponse {
+    +complianceEvents: ComplianceEventResource[]
+  }
+
+  interface NotificationPreferenceResource {
+    +id: number
+    +userId: number
+    +emailEnabled: boolean
+    +inAppEnabled: boolean
+    +minimumSeverity: "LOW | WARNING | CRITICAL"
+    +createdAt?: string
+  }
+
+  interface NotificationPreferencesResponse {
+    +preferences: NotificationPreferenceResource[]
+  }
+
+  interface ResolveAlertRequest {
+    +resolutionNotes: string
+  }
+
+  interface UpdateNotificationPreferenceRequest {
+    +emailEnabled: boolean
+    +inAppEnabled: boolean
+    +minimumSeverity: "LOW | WARNING | CRITICAL"
+  }
+
+  interface NotificationResource
+  interface NotificationsResponse
+  interface UnreadNotificationsResource {
+    +unreadCount: number
+  }
+  interface NotificationsReadResource {
+    +markedAsRead: number
+  }
+  interface AlertEmailNotificationResource {
+    +alertId: number
+    +recipients: number
+    +delivered: number
+    +sentAt: string
+  }
+}
+
+package "ca.presentation" {
+  class CaRoutes
+
+  class AlertTable <<component>> {
+    +alerts: input<DeviationAlert[]>
+    +emptyKey: input<string>
+    #variable(parameterName): string
+  }
+
+  class AlertDashboard {
+    #environmentId: Signal<number | null>
+    #changeEnvironment(environmentId): void
+    #refresh(): void
+  }
+
+  class AlertHistory {
+    #environmentId: Signal<number | null>
+    #status
+    #severity
+    #changeEnvironment(environmentId): void
+    #search(): void
+    #clearFilters(): void
+  }
+
+  class DeviationDetail {
+    #alert
+    #resolutionForm
+    #environmentName
+    #acknowledge(): void
+    #sendEmail(): void
+    #resolve(): void
+  }
+
+  class NotificationBell <<component>> {
+    #open: Signal<boolean>
+    #positions: ConnectedPosition[]
+    #toggle(): void
+    #openNotification(notification): void
+    #params(notification): Record<string, unknown>
+    #timeAgo(isoDate): string
+  }
+
+  class NotificationSettings
+
+  class NotificationPreferencesForm <<component>> {
+    #form
+    #saved / saving / error
+    #save(): void
+  }
+}
+
+DeviationAlert ..|> BaseEntity
+ComplianceEvent ..|> BaseEntity
+NotificationPreference ..|> BaseEntity
+Notification ..|> BaseEntity
+NotificationApiEndpoint --|> BaseApiEndpoint
+NotificationAssembler ..|> BaseAssembler
+NotificationResource ..|> BaseResource
+NotificationsResponse ..|> BaseResponse
+
+CaApi --|> BaseApi
+AlertApiEndpoint --|> BaseApiEndpoint
+ComplianceEventApiEndpoint --|> BaseApiEndpoint
+NotificationPreferenceApiEndpoint --|> BaseApiEndpoint
+
+AlertAssembler ..|> BaseAssembler
+ComplianceEventAssembler ..|> BaseAssembler
+NotificationPreferenceAssembler ..|> BaseAssembler
+
+AlertResource ..|> BaseResource
+AlertDetailResource --|> AlertResource
+AlertDetailResource --> "0..*" RelatedActuationResource
+AlertsResponse ..|> BaseResponse
+ComplianceEventResource ..|> BaseResource
+ComplianceEventsResponse ..|> BaseResponse
+NotificationPreferenceResource ..|> BaseResource
+NotificationPreferencesResponse ..|> BaseResponse
+
+CaStore --> CaApi
+CaStore ..> AlertDevice : device names
+CaStore --> IamStore
+CaStore ..> alertError
+alertError ..> ApiError
+
+CaStore ..> DeviationAlert
+CaStore ..> ComplianceEvent
+CaStore ..> NotificationPreference
+CaStore ..> ResolveAlertRequest
+CaStore ..> UpdateNotificationPreferenceRequest
+
+CaApi --> AlertApiEndpoint
+CaApi --> ComplianceEventApiEndpoint
+CaApi --> NotificationPreferenceApiEndpoint
+CaApi --> NotificationApiEndpoint
+NotificationApiEndpoint --> NotificationAssembler
+NotificationApiEndpoint ..> NotificationResource
+NotificationApiEndpoint ..> UnreadNotificationsResource
+NotificationApiEndpoint ..> NotificationsReadResource
+NotificationAssembler ..> Notification
+AlertApiEndpoint ..> AlertEmailNotificationResource
+CaStore --> IamStore : clears the notifications on another sign-in
+CaStore ..> Notification
+note bottom of NotificationApiEndpoint
+  GET  /users/me/notifications?unread&limit (US83)
+  GET  /users/me/notifications/unread-count
+  POST /users/me/notifications/{notificationId}/read-receipts
+  POST /users/me/notifications/read-receipts
+end note
+
+AlertApiEndpoint --> AlertAssembler
+AlertApiEndpoint ..> AlertFilters
+ComplianceEventApiEndpoint --> ComplianceEventAssembler
+NotificationPreferenceApiEndpoint --> NotificationPreferenceAssembler
+
+AlertApiEndpoint ..> AlertResource
+AlertApiEndpoint ..> AlertDetailResource
+AlertApiEndpoint ..> ResolveAlertRequest
+note bottom of AlertApiEndpoint
+  GET  /laboratories/{laboratoryId}/environments/{environmentId}/deviation-alerts
+       ?status&severity&deviceId&active (US85, TS74)
+  GET  /deviation-alerts/{alertId} (US86, with related actions)
+  POST /deviation-alerts/{alertId}/acknowledgements and /resolutions (US87, US88)
+  POST /deviation-alerts/{alertId}/email-notifications (US84, TS78)
+  The platform takes the actor from the session; requests carry no user id.
+end note
+
+ComplianceEventApiEndpoint ..> ComplianceEventResource
+NotificationPreferenceApiEndpoint ..> NotificationPreferenceResource
+NotificationPreferenceApiEndpoint ..> UpdateNotificationPreferenceRequest
+
+AlertAssembler ..> DeviationAlert
+AlertAssembler ..> AlertResource
+ComplianceEventAssembler ..> ComplianceEvent
+ComplianceEventAssembler ..> ComplianceEventResource
+NotificationPreferenceAssembler ..> NotificationPreference
+NotificationPreferenceAssembler ..> NotificationPreferenceResource
+
+AlertDashboard --> CaStore
+AlertDashboard ..> EnvironmentSelector
+AlertDashboard *-- AlertTable
+AlertHistory --> CaStore
+AlertHistory ..> EnvironmentSelector
+AlertHistory *-- AlertTable
+AlertTable --> CaStore
+
+DeviationDetail --> CaStore
+note bottom of DeviationDetail
+  Origin, variable, value and limit, follow-up (detected, last deviation,
+  normalized, attended, resolved) and related actions; operators and
+  quality managers register the attention and the resolution, auditors
+  only read. "View conditions" -> /tracking/history?environmentId=&deviceId=.
+end note
+note bottom of AlertDashboard
+  Open alerts (active=true) of the environment, remembered with the
+  tracking environment; the history lists every alert with filters.
+end note
+
+AlertDashboard ..> OperationsPage
+AlertHistory ..> OperationsPage
+DeviationDetail ..> OperationsPage
+
+NotificationBell --> CaStore
+NotificationBell ..> CdkConnectedOverlay : panel over the current view
+note bottom of NotificationBell
+  In the toolbar: counts the unread notifications every 30 s and opens
+  the latest ones; opening one marks it as read and shows the alert or batch.
+end note
+NotificationPreferencesForm --> CaStore
+note bottom of NotificationPreferencesForm
+  Shown on the notification settings page: bell, e-mail of critical alerts and the
+  lowest alert severity notified (/users/me/notification-preferences).
+end note
+
+CaRoutes ..> AlertDashboard
+CaRoutes ..> AlertHistory
+CaRoutes ..> DeviationDetail
+note bottom of CaRoutes
+  /alerts/notification-settings loads NotificationSettings.
+end note
+
+CaApi --> AlertDeviceApiEndpoint
+AlertDeviceApiEndpoint --> AlertDeviceAssembler
+AlertDeviceAssembler ..> AlertDevice
+CaApi --> AlertEnvironmentApiEndpoint
+AlertEnvironmentApiEndpoint --> AlertEnvironmentAssembler
+AlertEnvironmentAssembler ..> AlertEnvironment
+CaStore --> EnvironmentPreference
+note bottom of AlertEnvironmentApiEndpoint
+  Laboratory -> Compliance & Alerts: GET /laboratories/{id}/environments
+  in the model of CA; the chosen environment is remembered with the
+  monitoring views ("tracking").
+end note
+CaRoutes --> NotificationSettings
+NotificationSettings *-- NotificationPreferencesForm
+NotificationBell ..> NotificationSettings : navigation link
+
+note left of CaRoutes
+  Source: ca/presentation/ca.routes.ts
+  Public paths and guards remain unchanged.
+end note
+
+@enduml

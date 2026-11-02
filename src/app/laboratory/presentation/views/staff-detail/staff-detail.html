@@ -1,0 +1,62 @@
+<section class="operations-page" [attr.aria-busy]="loading()">
+  <a class="back-link" routerLink="/laboratories/staff-list">
+    <mat-icon aria-hidden="true">arrow_back</mat-icon>
+    {{ 'staff-list.title' | translate }}
+  </a>
+
+  @if (loading()) {
+    <div class="loading">
+      <mat-spinner diameter="40" [attr.aria-label]="'onboarding.loading-data' | translate"></mat-spinner>
+    </div>
+  } @else if (member(); as current) {
+    <div class="page-heading">
+      <div>
+        <h1>
+          <mat-icon aria-hidden="true">badge</mat-icon>
+          {{ current.fullName }}
+        </h1>
+        <p class="muted">{{ current.role }} · {{ current.email }}</p>
+      </div>
+      @if (iam.canManageQuality() && current.active) {
+        <div class="actions">
+          <button mat-stroked-button color="warn" type="button" [disabled]="deactivating()" (click)="deactivate(current)">
+            <mat-icon>person_off</mat-icon>
+            {{ 'staff-list.deactivate' | translate }}
+          </button>
+        </div>
+      }
+    </div>
+
+    @if (error(); as message) {
+      <p class="error" role="alert">{{ message | translate }}</p>
+    }
+
+    <div class="actions staff-links">
+      @if (iam.canManageQuality() && current.userId !== null) {
+        <a mat-stroked-button [routerLink]="['/profile/staff', current.id]">
+          <mat-icon>person</mat-icon>{{ 'staff.detail.view-profile' | translate }}
+        </a>
+      }
+      <a mat-stroked-button [routerLink]="['/reports/staff-activity', current.id]">
+        <mat-icon>history</mat-icon>{{ 'staff.detail.view-activity' | translate }}
+      </a>
+    </div>
+
+    <div class="summary-strip">
+      <div>
+        <span>{{ 'staff-list.access-role' | translate }}</span>
+        <strong>
+          {{ (current.accessRole ? 'staff.access-roles.' + current.accessRole.toLowerCase() : 'staff.no-account') | translate }}
+        </strong>
+      </div>
+      <div>
+        <span>{{ 'staff-list.status' | translate }}</span>
+        <strong class="state" [class.inactive]="!current.active">
+          {{ (current.active ? 'common.active' : 'common.inactive') | translate }}
+        </strong>
+      </div>
+    </div>
+  } @else {
+    <p class="error" role="alert">{{ (error() ?? 'staff.detail.load-error') | translate }}</p>
+  }
+</section>

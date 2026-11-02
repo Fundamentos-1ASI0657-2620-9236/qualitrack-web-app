@@ -1,0 +1,469 @@
+@startuml iam-frontend-diagram
+
+title QualiTrack - IAM Frontend Class Diagram
+
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam linetype ortho
+
+package "shared" <<External>> {
+  interface BaseEntity
+  interface BaseResource
+  abstract class BaseApi
+  abstract class ErrorHandlingEnabledBaseType
+  class Toolbar
+}
+
+package "angular" <<External>> {
+  class Router
+  class ActivatedRoute
+  class HttpClient
+  class FormGroup
+  class FormControl
+  class Validators
+  interface HttpInterceptorFn
+  interface Routes
+}
+
+package "iam.domain.model" {
+  class User {
+    + id: number
+    + username: string
+    + email: string | null
+    + roles: string[]
+    + constructor(params)
+  }
+
+  interface SignInCommand {
+    + username: string
+    + password: string
+  }
+
+  interface SignUpCommand {
+    + username: string
+    + email: string
+    + password: string
+    + roles: string[]
+    + laboratoryId: number | null
+  }
+
+  interface ResetPasswordCommand {
+    + account: string
+    + code: string
+    + newPassword: string
+  }
+
+  interface AssignRoleCommand {
+    + userId: number
+    + role: string
+  }
+
+  interface UpdateAccountCommand {
+    + username: string
+    + email: string
+    + currentPassword: string
+  }
+}
+
+User ..|> BaseEntity
+
+package "iam.application" {
+  class IamStore {
+    - _loadingSignal
+    - _errorSignal
+    - isSignedInSignal
+    - currentUsernameSignal
+    - currentUserIdSignal
+    - currentLaboratoryIdSignal
+    - usersSignal
+    - loadingUsers
+    + isSignedIn
+    + currentUsername
+    + currentUserId
+    + currentLaboratoryId
+    + currentToken
+    + users
+    + loading
+    + error
+    + isLoadingUsers
+    + onboarding: Signal<OnboardingState | null>
+    + canManageQuality: Signal<boolean>
+    + isAuditor: Signal<boolean>
+    + canOperate: Signal<boolean>
+    + loadOnboarding(force?: boolean): Observable<OnboardingState>
+    + nextViewOf(state: OnboardingState): string
+    + invalidateOnboarding(): void
+    + changePassword(currentPassword: string, newPassword: string): Observable<void>
+    + updateAccount(command: UpdateAccountCommand): Observable<void>
+    + requestPasswordRecovery(account: string): Observable<number>
+    + resetPassword(command: ResetPasswordCommand): Observable<string>
+    + signIn(command: SignInCommand, router: Router): void
+    + signUp(command: SignUpCommand, router: Router): void
+    + signOut(router: Router): void
+    + clearError(): void
+    - storeSession(resource: SignInResource): void
+    - restoreSession(): void
+    - clearSession(): void
+    - startRequest(): void
+    - finishRequest(): void
+    - failRequest(message: string): void
+  }
+}
+
+IamStore ..> SignInCommand
+IamStore ..> SignUpCommand
+IamStore ..> ResetPasswordCommand
+IamStore ..> UpdateAccountCommand
+note left of UpdateAccountCommand
+  PUT /users/me answers with a new token (the token names
+  the user); the store keeps the session with it.
+end note
+IamStore --> Router
+IamStore o-- User
+note right of IamStore
+  isAuditor: every role of the account is ROLE_AUDITOR (read-only).
+  canOperate: signed in and not an auditor.
+end note
+
+package "iam.domain.model.onboarding" {
+  interface OnboardingState {
+    + userId: number
+    + laboratoryId: number | null
+    + subscriptionStatus: 'ACTIVE' | 'INACTIVE'
+    + nextStep: 'PASSWORD_CHANGE' | 'SUBSCRIPTION' | 'LABORATORY' | 'READY'
+  }
+  class onboardingDestination <<function>>
+}
+
+IamStore ..> OnboardingState
+note bottom of onboardingDestination
+  PASSWORD_CHANGE -> /iam/change-password
+  inactive subscription -> /subscriptions/plans (quality managers)
+  or the onboarding view with "access paused" (staff members)
+end note
+
+package "iam.infrastructure" {
+  class IamApi {
+    - signInEndpoint: SignInApiEndpoint
+    - signUpEndpoint: SignUpApiEndpoint
+    - passwordRecoveryEndpoint: PasswordRecoveryApiEndpoint
+    + signIn(request: SignInRequest): Observable<SignInResource>
+    + signUp(request: SignUpRequest): Observable<SignUpResource>
+    + requestPasswordRecovery(request: PasswordRecoveryRequest): Observable<PasswordRecoveryAcceptedResource>
+    + resetPassword(request: PasswordResetRequest): Observable<PasswordResetCompletedResource>
+    + getOnboarding(): Observable<OnboardingState>
+    + changePassword(request: ChangePasswordRequest): Observable<void>
+    + updateAccount(request: UpdateAccountRequest): Observable<SignInResource>
+  }
+  interface ChangePasswordRequest {
+    + currentPassword: string
+    + newPassword: string
+  }
+  interface UpdateAccountRequest {
+    + username: string
+    + email: string
+    + currentPassword: string
+  }
+  class iamGuard <<CanActivateFn>>
+  class onboardingGuard <<CanActivateFn>>
+  class laboratorySetupGuard <<CanActivateFn>>
+  class subscriptionGuard <<CanActivateFn>>
+  class passwordChangeGuard <<CanActivateFn>>
+  class qualityManagerGuard <<CanActivateFn>>
+  class operatorGuard <<CanActivateFn>>
+  class staffActivityGuard <<CanActivateFn>>
+
+  class SignInApiEndpoint {
+    - http: HttpClient
+    - assembler: SignInAssembler
+    + signIn(request: SignInRequest): Observable<SignInResource>
+  }
+
+  class SignUpApiEndpoint {
+    - http: HttpClient
+    - assembler: SignUpAssembler
+    + signUp(request: SignUpRequest): Observable<SignUpResource>
+  }
+
+  class PasswordRecoveryApiEndpoint {
+    - http: HttpClient
+    + requestRecovery(request: PasswordRecoveryRequest): Observable<PasswordRecoveryAcceptedResource>
+    + resetPassword(request: PasswordResetRequest): Observable<PasswordResetCompletedResource>
+  }
+  note bottom of PasswordRecoveryApiEndpoint
+    POST /authentication/password-recovery-requests (TS05, 202)
+    POST /authentication/password-resets (TS06, 200 / 400)
+  end note
+  interface ChangePasswordRequest {
+    + currentPassword: string
+    + newPassword: string
+  }
+
+  class SignInAssembler {
+    + toResourceFromResponse(response: SignInResponse): SignInResource
+  }
+
+  class SignUpAssembler {
+    + toResourceFromResponse(response: SignUpResponse): SignUpResource
+  }
+
+
+  interface SignInRequest {
+    + username: string
+    + password: string
+  }
+
+  interface SignUpRequest {
+    + username: string
+    + email: string
+    + password: string
+    + roles: string[]
+    + laboratoryId: number | null
+  }
+
+  interface PasswordRecoveryRequest {
+    + account: string
+  }
+
+  interface PasswordResetRequest {
+    + account: string
+    + code: string
+    + newPassword: string
+  }
+
+  interface SignInResource {
+    + id: number
+    + username: string
+    + roles: string[]
+    + laboratoryId: number | null
+    + token: string
+  }
+
+  interface SignInResponse
+
+  interface SignUpResource {
+    + id: number
+    + username: string
+  }
+
+  interface SignUpResponse
+
+  interface PasswordRecoveryAcceptedResource {
+    + codeValidityMinutes: number
+  }
+
+  interface PasswordResetCompletedResource {
+    + username: string
+  }
+
+  class authenticationInterceptor <<HttpInterceptorFn>>
+}
+
+IamStore --> IamApi
+IamStore ..> SignInRequest
+IamStore ..> SignUpRequest
+
+IamApi --|> BaseApi
+SignInApiEndpoint --|> ErrorHandlingEnabledBaseType
+SignUpApiEndpoint --|> ErrorHandlingEnabledBaseType
+
+IamApi *-- SignInApiEndpoint
+IamApi *-- SignUpApiEndpoint
+IamApi *-- PasswordRecoveryApiEndpoint
+
+SignInApiEndpoint --> HttpClient
+SignInApiEndpoint --> SignInAssembler
+SignInApiEndpoint ..> SignInRequest
+SignInApiEndpoint ..> SignInResponse
+SignInApiEndpoint ..> SignInResource
+
+SignUpApiEndpoint --> HttpClient
+SignUpApiEndpoint --> SignUpAssembler
+SignUpApiEndpoint ..> SignUpRequest
+SignUpApiEndpoint ..> SignUpResponse
+SignUpApiEndpoint ..> SignUpResource
+
+PasswordRecoveryApiEndpoint --> HttpClient
+PasswordRecoveryApiEndpoint ..> PasswordRecoveryRequest
+PasswordRecoveryApiEndpoint ..> PasswordResetRequest
+PasswordRecoveryApiEndpoint ..> PasswordRecoveryAcceptedResource
+PasswordRecoveryApiEndpoint ..> PasswordResetCompletedResource
+
+SignInAssembler ..> SignInResponse
+SignInAssembler ..> SignInResource
+
+SignUpAssembler ..> SignUpResponse
+SignUpAssembler ..> SignUpResource
+
+
+SignInResource ..|> BaseResource
+SignInResponse --|> SignInResource
+SignUpResource ..|> BaseResource
+SignUpResponse --|> SignUpResource
+
+authenticationInterceptor ..|> HttpInterceptorFn
+authenticationInterceptor --> IamStore
+IamApi ..> ChangePasswordRequest
+iamGuard --> IamStore
+onboardingGuard --> IamStore
+laboratorySetupGuard --> IamStore
+subscriptionGuard --> IamStore
+passwordChangeGuard --> IamStore
+qualityManagerGuard --> IamStore
+operatorGuard --> IamStore
+staffActivityGuard --> IamStore
+note bottom of qualityManagerGuard
+  qualityManagerGuard: subscriptions, billing and staff registration.
+  operatorGuard: maintenance, BPM limits and new batches (not auditors).
+  staffActivityGuard: staff activity history (quality managers and auditors).
+end note
+
+package "iam.presentation.routes" {
+  class iamRoutes <<Routes>>
+}
+
+iamRoutes ..|> Routes
+note right of iamRoutes
+  /iam/onboarding, /iam/sign-in, /iam/sign-up (quality managers only),
+  /iam/change-password (first sign in of a staff account),
+  /iam/password-recovery (public: code by e-mail, then new password)
+end note
+
+package "iam.presentation.views.onboarding" {
+  class Onboarding {
+    # loading: Signal<boolean>
+    # subscriptionPaused: Signal<boolean>
+    # resolve(): void
+    # signOut(): void
+  }
+}
+
+iamRoutes ..> Onboarding
+
+package "iam.presentation.views.change-password-form" {
+  class ChangePasswordForm {
+    # form: FormGroup
+    # saving: Signal<boolean>
+    # error: Signal<string | null>
+    # submit(): void
+    # signOut(): void
+  }
+}
+
+iamRoutes ..> ChangePasswordForm
+
+package "iam.presentation.views.password-recovery" {
+  class PasswordRecovery {
+    # step: Signal<'request' | 'reset'>
+    # sending: Signal<boolean>
+    # error: Signal<string | null>
+    # notice: Signal<string | null>
+    # validityMinutes: Signal<number>
+    # accountForm: FormGroup
+    # resetForm: FormGroup
+    # requestCode(): void
+    # resetPassword(): void
+    # changeAccount(): void
+  }
+}
+
+iamRoutes ..> PasswordRecovery
+
+Onboarding --> IamStore
+ChangePasswordForm --> IamStore
+PasswordRecovery --> IamStore
+PasswordRecovery --> Router
+PasswordRecovery ..> ResetPasswordCommand
+PasswordRecovery ..> Toolbar
+note bottom of PasswordRecovery
+  US16/US17: username or e-mail -> 6-digit code by e-mail (15 minutes,
+  one per minute) -> code and new password -> sign in with a notice and
+  the username filled in (navigation state).
+end note
+
+package "iam.presentation.components.authentication-section" {
+  class AuthenticationSection {
+  }
+}
+
+package "iam.presentation.components.user-session-section" {
+  class UserSessionSection {
+    # signOut(): void
+  }
+}
+
+UserSessionSection --> IamStore
+note bottom of UserSessionSection
+  IAM only shows the sign-out action while signed in.
+  The shared layout places it beside the Profile badge;
+  IAM does not import or load Profile data.
+end note
+
+AuthenticationSection ..> Router
+
+package "iam.presentation.views.sign-in-form" {
+  class SignInForm {
+    - router: Router
+    # store: IamStore
+    # form: FormGroup
+    # hidePassword: boolean
+    # passwordReset: boolean
+    # onSubmit(): void
+    # togglePasswordVisibility(): void
+    # getUsernameErrorKey(): string
+    # getPasswordErrorKey(): string
+    - markFormGroupTouched(formGroup: FormGroup): void
+  }
+}
+
+iamRoutes ..> SignInForm
+
+SignInForm --> IamStore
+SignInForm --> Router
+SignInForm --> FormGroup
+SignInForm --> FormControl
+SignInForm ..> Validators
+SignInForm ..> SignInCommand
+SignInForm ..> Toolbar
+
+package "iam.presentation.views.sign-up-form" {
+  class SignUpForm {
+    - router: Router
+    # store: IamStore
+    # selectedRole: 'ROLE_QA_MANAGER'
+    # selectedRoleKey: 'manager'
+    # form: FormGroup
+    # hidePassword: boolean
+    # hideConfirmPassword: boolean
+    # onSubmit(): void
+    # togglePasswordVisibility(): void
+    # toggleConfirmPasswordVisibility(): void
+    # getUsernameErrorKey(): string
+    # getEmailErrorKey(): string
+    # getPasswordErrorKey(): string
+    # getConfirmPasswordErrorKey(): string
+    - passwordStrengthValidator(control): ValidationErrors | null
+    - passwordMatchValidator(group): ValidationErrors | null
+    - markFormGroupTouched(formGroup: FormGroup): void
+  }
+}
+
+iamRoutes ..> SignUpForm
+
+SignUpForm --> IamStore
+SignUpForm --> Router
+SignUpForm --> FormGroup
+SignUpForm --> FormControl
+SignUpForm ..> Validators
+SignUpForm ..> SignUpCommand
+SignUpForm ..> Toolbar
+note bottom of SignUpForm
+  Public registration creates quality manager accounts only; operators and
+  auditors receive the account their quality manager creates. The e-mail is
+  required (recovery codes) and the password has 8 to 72 letters and numbers.
+end note
+
+PasswordRecoveryApiEndpoint --|> ErrorHandlingEnabledBaseType
+
+@enduml

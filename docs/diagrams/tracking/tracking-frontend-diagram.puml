@@ -1,0 +1,449 @@
+@startuml tracking-frontend-diagram
+title QualiTrack - Tracking Frontend
+
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+
+package "shared" <<External>> {
+  class ErrorHandlingEnabledBaseType
+  class EnvironmentSelector <<component>>
+  class EnvironmentPreference
+  interface BaseEntity
+  interface BaseResource
+  interface BaseResponse
+  interface BaseAssembler
+  abstract class BaseApiEndpoint
+}
+
+package "iam" <<External>> {
+  class IamStore {
+    +canManageQuality: Signal<boolean>
+    +requireLaboratoryId(): number
+  }
+}
+
+package "tracking" {
+
+  package "domain.model" {
+    enum MonitoredDeviceType {
+      ENVIRONMENTAL_DEVICE
+      CONTAINER_MONITOR
+    }
+
+    class MonitoredDevice {
+      +id: number
+      +name: string
+      +deviceType: MonitoredDeviceType
+      +environmentId: number | null
+      +isContainerMonitor: boolean
+    }
+
+    class MonitoredEnvironment {
+      +id: number
+      +code: string
+      +name: string
+      +usage: string | null
+    }
+
+    enum MonitoredMetric {
+      AIR_QUALITY
+      MOTION
+      TEMPERATURE
+      HUMIDITY
+      LUMINOSITY
+      RFID_TAG
+    }
+
+    enum EnvironmentalState {
+      NORMAL
+      WARNING
+      CRITICAL
+    }
+
+    class MetricDefinition <<interface>> {
+      +metric: MonitoredMetric
+      +unit: string
+      +deviceType: MonitoredDeviceType
+      +configurable: boolean
+      +upperOnly: boolean
+    }
+
+    class MonitoredMetrics <<functions>> {
+      +METRICS: MetricDefinition[]
+      +metricsOf(deviceType): MetricDefinition[]
+      +configurableMetricsOf(deviceType): MetricDefinition[]
+      +metricDefinition(metric): MetricDefinition | undefined
+    }
+
+    class Measurement {
+      +id: number
+      +deviceId: number
+      +environmentId: number | null
+      +metric: MonitoredMetric
+      +value: number | null
+      +textValue: string | null
+      +unit: string
+      +measuredAt: string
+      +state: EnvironmentalState | null
+      +thresholdValue: number | null
+      +profileVersion: number | null
+      +isDeviation: boolean
+    }
+
+    enum ActuationAction {
+      VENTILATION_ON
+      VENTILATION_OFF
+      COOLING_ON
+      COOLING_OFF
+      SERVO_OPEN
+      SERVO_CLOSE
+    }
+
+    class ActuationEvent {
+      +id: number
+      +deviceId: number
+      +environmentId: number
+      +action: ActuationAction
+      +triggerMetric: MonitoredMetric | null
+      +triggerState: EnvironmentalState | null
+      +result: 'EXECUTED' | 'FAILED'
+      +occurredAt: string
+      +profileVersion: number | null
+    }
+
+    class EnvironmentalThreshold <<interface>> {
+      +metric: MonitoredMetric
+      +unit: string
+      +normalMin: number | null
+      +normalMax: number | null
+      +criticalMin: number | null
+      +criticalMax: number | null
+    }
+
+    class ActuationRule <<interface>> {
+      +metric: MonitoredMetric
+      +state: 'WARNING' | 'CRITICAL'
+      +action: ActuationAction
+    }
+
+    class EnvironmentalProfile {
+      +id: number
+      +scope: 'ENVIRONMENT' | 'CONTAINER_MONITOR'
+      +environmentId: number | null
+      +deviceId: number | null
+      +version: number
+      +thresholds: EnvironmentalThreshold[]
+      +actuationRules: ActuationRule[]
+      +updatedAt: string | null
+      +threshold(metric): EnvironmentalThreshold | undefined
+    }
+
+    enum DeviceConnectionStatus {
+      CONNECTED
+      REQUIRES_REVIEW
+    }
+
+    class DeviceConnection {
+      +id: number
+      +connectionStatus: DeviceConnectionStatus
+      +lastCommunicationAt: string | null
+      +expectedPeriodSeconds: number
+      +isConnected: boolean
+    }
+  }
+
+  package "application" {
+    class DeviceSnapshot <<interface>> {
+      +device: MonitoredDevice
+      +readings: Map<MonitoredMetric, Measurement>
+      +lastMotion: Measurement | null
+      +lastAction: ActuationEvent | null
+      +connection: DeviceConnection | null
+      +failed: boolean
+    }
+
+    class DeviceHistory <<interface>> {
+      +device: MonitoredDevice
+      +period: TelemetryPeriod
+      +measurements: Measurement[]
+      +actuationEvents: ActuationEvent[]
+      +profile: EnvironmentalProfile | null
+    }
+
+    class TrackingStore {
+      -api: TrackingApi
+      -iam: IamStore
+      +environments: Signal<MonitoredEnvironment[]>
+      +environmentsLoaded / environmentsEmpty: Signal<boolean>
+      +environmentId: Signal<number | null>
+      +devices: Signal<MonitoredDevice[]>
+      +environmentalDevice: Signal<MonitoredDevice | null>
+      +containerMonitors: Signal<MonitoredDevice[]>
+      +snapshots: Signal<DeviceSnapshot[]>
+      +history: Signal<DeviceHistory | null>
+      +environmentProfile: Signal<EnvironmentalProfile | null>
+      +containerProfiles: Signal<Map<number, EnvironmentalProfile>>
+      +canConfigure: Signal<boolean>
+      +isLoading / saving / error / notice
+      +loadEnvironments(): Promise<void>
+      +preferredEnvironmentId(): number | null
+      +rememberEnvironment(environmentId): void
+      +selectEnvironment(environmentId): Promise<void>
+      +loadSnapshots(): Promise<void>
+      +loadHistory(device, period, metric): Promise<void>
+      +loadProfiles(): Promise<void>
+      +saveThresholds(deviceId | null, thresholds): Promise<boolean>
+      +saveActuationRules(deviceId, rules): Promise<boolean>
+      +clearMessages(): void
+    }
+
+    class recentPeriod <<function>> {
+      +recentPeriod(): TelemetryPeriod
+    }
+  }
+
+  package "infrastructure" {
+    class TelemetryRequest <<functions>> {
+      +targetPath(base, target): string
+      +periodParams(period, metric): HttpParams
+    }
+
+    class DeviceTarget <<interface>> {
+      +laboratoryId: number
+      +environmentId: number
+      +deviceId: number | null
+    }
+
+    class TelemetryPeriod <<interface>> {
+      +from: string
+      +to: string
+    }
+
+    interface MeasurementResource
+    interface MeasurementsResponse
+    interface ActuationEventResource
+    interface ActuationEventsResponse
+    interface EnvironmentalProfileResource
+    interface EnvironmentalProfilesResponse
+    interface DeviceConnectionResource
+    interface DeviceConnectionsResponse
+
+    class MeasurementAssembler
+    class ActuationEventAssembler
+    class EnvironmentalProfileAssembler
+    class DeviceConnectionAssembler
+
+    class MeasurementApiEndpoint {
+      +getMeasurements(target, period, metric?): Observable<Measurement[]>
+    }
+
+    class ActuationEventApiEndpoint {
+      +getActuationEvents(target, period): Observable<ActuationEvent[]>
+    }
+
+    class EnvironmentalProfileApiEndpoint {
+      +getProfile(target): Observable<EnvironmentalProfile | null>
+      +updateThresholds(target, thresholds): Observable<EnvironmentalProfile>
+      +updateActuationRules(target, rules): Observable<EnvironmentalProfile>
+    }
+
+    class DeviceConnectionApiEndpoint {
+      +getConnection(laboratoryId, environmentId, deviceId): Observable<DeviceConnection>
+    }
+
+    class MonitoredDeviceApiEndpoint {
+      +getDevices(laboratoryId, environmentId): Observable<MonitoredDevice[]>
+    }
+    class MonitoredDeviceAssembler {
+      +isMonitored(resource): boolean
+      +toEntityFromResource(resource): MonitoredDevice
+    }
+    class MonitoredEnvironmentApiEndpoint {
+      +getEnvironments(laboratoryId): Observable<MonitoredEnvironment[]>
+    }
+    class MonitoredEnvironmentAssembler
+
+    class TrackingApi {
+      +getMeasurements(target, period, metric?): Observable<Measurement[]>
+      +getActuationEvents(target, period): Observable<ActuationEvent[]>
+      +getProfile(target): Observable<EnvironmentalProfile | null>
+      +updateThresholds(target, thresholds): Observable<EnvironmentalProfile>
+      +updateActuationRules(target, rules): Observable<EnvironmentalProfile>
+      +getDeviceConnection(laboratoryId, environmentId, deviceId): Observable<DeviceConnection>
+      +getEnvironments(laboratoryId): Observable<MonitoredEnvironment[]>
+      +getDevices(laboratoryId, environmentId): Observable<MonitoredDevice[]>
+    }
+  }
+
+  package "presentation" {
+    class TrackingRoutes <<Routes>> {
+      +dashboard: EnvironmentalMonitoring
+      +history: TelemetryHistory
+      +profiles: EnvironmentalProfiles
+      +analysis: redirect to history
+    }
+
+    class EnvironmentalMonitoring <<component>> {
+      #refresh(): void
+      #snapshotOf(deviceId): DeviceSnapshot | undefined
+      #reading(snapshot, metric): Measurement | undefined
+    }
+
+    class TelemetryHistory <<component>> {
+      #chartMetric: Signal<MonitoredMetric | null>
+      #chartData: Signal<ChartData>
+      #chartOptions: Signal<ChartOptions>
+      #changeEnvironment(environmentId, preferredDeviceId?): Promise<void>
+      #changeDevice(): void
+    }
+
+    class EnvironmentalProfiles <<component>> {
+      #saveEnvironment(thresholds): void
+      #saveContainer(deviceId, thresholds): void
+      #saveRules(deviceId, rules): void
+    }
+
+    class ThresholdEditor <<component>> {
+      +metrics: input<MetricDefinition[]>
+      +thresholds: input<EnvironmentalThreshold[]>
+      +readonly: input<boolean>
+      +saving: input<boolean>
+      +save: output<ThresholdInput[]>
+    }
+
+    class ActuationRulesEditor <<component>> {
+      +metrics: input<MonitoredMetric[]>
+      +rules: input<ActuationRule[]>
+      +readonly: input<boolean>
+      +saving: input<boolean>
+      +save: output<ActuationRule[]>
+    }
+  }
+}
+
+Measurement --|> BaseEntity
+ActuationEvent --|> BaseEntity
+EnvironmentalProfile --|> BaseEntity
+DeviceConnection --|> BaseEntity
+Measurement --> MonitoredMetric
+Measurement --> EnvironmentalState
+ActuationEvent --> ActuationAction
+EnvironmentalProfile *-- EnvironmentalThreshold
+EnvironmentalProfile *-- ActuationRule
+ActuationRule --> ActuationAction
+DeviceConnection --> DeviceConnectionStatus
+MonitoredMetrics ..> MetricDefinition
+MetricDefinition --> MonitoredDeviceType
+MonitoredDevice --> MonitoredDeviceType
+
+MeasurementResource --|> BaseResource
+ActuationEventResource --|> BaseResource
+EnvironmentalProfileResource --|> BaseResource
+DeviceConnectionResource --|> BaseResource
+MeasurementsResponse --|> BaseResponse
+ActuationEventsResponse --|> BaseResponse
+EnvironmentalProfilesResponse --|> BaseResponse
+DeviceConnectionsResponse --|> BaseResponse
+
+MeasurementAssembler ..|> BaseAssembler
+ActuationEventAssembler ..|> BaseAssembler
+EnvironmentalProfileAssembler ..|> BaseAssembler
+DeviceConnectionAssembler ..|> BaseAssembler
+
+MeasurementApiEndpoint --|> BaseApiEndpoint
+ActuationEventApiEndpoint --|> BaseApiEndpoint
+EnvironmentalProfileApiEndpoint --|> BaseApiEndpoint
+DeviceConnectionApiEndpoint --|> BaseApiEndpoint
+
+MeasurementApiEndpoint --> MeasurementAssembler
+ActuationEventApiEndpoint --> ActuationEventAssembler
+EnvironmentalProfileApiEndpoint --> EnvironmentalProfileAssembler
+DeviceConnectionApiEndpoint --> DeviceConnectionAssembler
+MeasurementApiEndpoint ..> DeviceTarget
+MeasurementApiEndpoint ..> TelemetryPeriod
+ActuationEventApiEndpoint ..> DeviceTarget
+EnvironmentalProfileApiEndpoint ..> DeviceTarget
+
+TrackingApi *-- MeasurementApiEndpoint
+TrackingApi *-- ActuationEventApiEndpoint
+TrackingApi *-- EnvironmentalProfileApiEndpoint
+TrackingApi *-- DeviceConnectionApiEndpoint
+TrackingApi *-- MonitoredDeviceApiEndpoint
+TrackingApi *-- MonitoredEnvironmentApiEndpoint
+MonitoredDeviceApiEndpoint --|> ErrorHandlingEnabledBaseType
+MonitoredEnvironmentApiEndpoint --|> ErrorHandlingEnabledBaseType
+MonitoredDeviceApiEndpoint --> MonitoredDeviceAssembler
+MonitoredEnvironmentApiEndpoint --> MonitoredEnvironmentAssembler
+MonitoredDeviceAssembler ..> MonitoredDevice
+MonitoredEnvironmentAssembler ..> MonitoredEnvironment
+note bottom of MonitoredDeviceApiEndpoint
+  Anti-Corruption Layer Equipment -> Tracking: reads
+  GET /laboratories/{id}/equipments and keeps the IoT devices
+  of one environment. Environments come from
+  GET /laboratories/{id}/environments (Laboratory -> Tracking).
+end note
+
+TrackingStore --> TrackingApi
+TrackingStore --> IamStore
+TrackingStore --> EnvironmentPreference : "tracking"
+TrackingStore *-- DeviceSnapshot
+TrackingStore *-- DeviceHistory
+
+EnvironmentalMonitoring --> TrackingStore
+EnvironmentalMonitoring ..> EnvironmentSelector
+TelemetryHistory --> TrackingStore
+TelemetryHistory ..> EnvironmentSelector
+EnvironmentalProfiles --> TrackingStore
+EnvironmentalProfiles ..> EnvironmentSelector
+EnvironmentalProfiles ..> ThresholdEditor
+EnvironmentalProfiles ..> ActuationRulesEditor
+
+TrackingRoutes ..> EnvironmentalMonitoring
+TrackingRoutes ..> TelemetryHistory
+TrackingRoutes ..> EnvironmentalProfiles
+
+note right of DeviceTarget
+  deviceId null: /laboratories/{lab}/environments/{env}/...
+  (environmental device of the environment)
+  deviceId set:  .../environments/{env}/container-monitors/{deviceId}/...
+end note
+note right of EnvironmentalProfileApiEndpoint
+  GET .../environmental-profile (404 -> null: not configured yet)
+  PUT .../environmental-profile/thresholds
+  PUT .../container-monitors/{deviceId}/environmental-profile/actuation-rules
+end note
+note right of DeviceConnectionApiEndpoint
+  GET /laboratories/{laboratoryId}/environments/{environmentId}
+      /devices/{deviceId}/telemetry-status (TS41)
+end note
+note bottom of EnvironmentalProfiles
+  Quality managers and administrators edit thresholds and rules
+  (US56-US59); the other roles see them read-only.
+end note
+note bottom of TelemetryHistory
+  /tracking/history?environmentId=&deviceId= opens the history of the
+  container where a raw material lot or product batch is stored.
+end note
+note bottom of EnvironmentalMonitoring
+  Current conditions of the last 24 hours per device: latest reading per
+  metric with its state, last motion, RFID tag, last action and connection.
+end note
+
+note left of TrackingRoutes
+  Source: tracking/presentation/tracking.routes.ts
+  Public paths and guards remain unchanged.
+end note
+
+MeasurementApiEndpoint ..> TelemetryRequest
+ActuationEventApiEndpoint ..> TelemetryRequest
+EnvironmentalProfileApiEndpoint ..> TelemetryRequest
+note bottom of TelemetryRequest
+  telemetry-request.ts holds shared URL and query construction.
+  device-target.ts and telemetry-period.ts declare request types.
+  Each endpoint and assembler has its own file:
+  measurement-api-endpoint.ts / measurement-assembler.ts
+  actuation-event-api-endpoint.ts / actuation-event-assembler.ts
+  environmental-profile-api-endpoint.ts / environmental-profile-assembler.ts
+end note
+
+@enduml
